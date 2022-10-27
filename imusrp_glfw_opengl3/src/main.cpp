@@ -3,6 +3,9 @@
 // If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
 // Read online: https://github.com/ocornut/imgui/tree/master/docs
 
+// Enable 32-bit indexing for implot
+#define IMGUI_USER_CONFIG "imusrp_imgui_config.h"
+
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -14,6 +17,8 @@
 
 #include "implot.h"
 #include "implot_internal.h"
+
+
 
 // Application-specific includes
 #include "../imusrp_ui/ImUsrpUi.h"

@@ -48,6 +48,12 @@
     <ClInclude Include="..\imgui\backends\imgui_impl_opengl3_loader.h">
       <Filter>imgui_impl</Filter>
     </ClInclude>
+    <ClInclude Include="imusrp_imgui_config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\imusrp_ui\ImUsrpUiRx.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\imusrp_ui\ImUsrpUi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -87,6 +93,9 @@
       <Filter>imgui_impl</Filter>
     </ClCompile>
     <ClCompile Include="..\imusrp_ui\ImUsrpUi.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\imusrp_ui\ImUsrpUiRx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

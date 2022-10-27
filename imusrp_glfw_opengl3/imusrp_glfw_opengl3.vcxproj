@@ -134,7 +134,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\imgui\backends;$(SolutionDir)..\imgui;$(SolutionDir)..\imgui\examples\libs\glfw\include;$(SolutionDir)..\implot;$(UHD_DIR_3_15_0)\include;$(BOOST_DIR_1_72);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\imgui\backends;$(SolutionDir)..\imgui;$(SolutionDir)..\imgui\examples\libs\glfw\include;$(SolutionDir)..\implot;$(UHD_DIR_3_15_0)\include;$(BOOST_DIR_1_72);$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -155,6 +155,8 @@
     <ClInclude Include="..\implot\implot.h" />
     <ClInclude Include="..\implot\implot_internal.h" />
     <ClInclude Include="..\imusrp_ui\ImUsrpUi.h" />
+    <ClInclude Include="..\imusrp_ui\ImUsrpUiRx.h" />
+    <ClInclude Include="imusrp_imgui_config.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\imgui\backends\imgui_impl_glfw.cpp" />
@@ -168,6 +170,7 @@
     <ClCompile Include="..\implot\implot_demo.cpp" />
     <ClCompile Include="..\implot\implot_items.cpp" />
     <ClCompile Include="..\imusrp_ui\ImUsrpUi.cpp" />
+    <ClCompile Include="..\imusrp_ui\ImUsrpUiRx.cpp" />
     <ClCompile Include="src\main.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

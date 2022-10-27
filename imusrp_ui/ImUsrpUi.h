@@ -13,14 +13,17 @@
 #include <uhd/utils/safe_main.hpp>
 #include <uhd/utils/static.hpp>
 #include <uhd/utils/thread.hpp>
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
+//#include <boost/algorithm/string.hpp>
+//#include <boost/filesystem.hpp>
 #include <boost/format.hpp>
 #include <boost/math/special_functions/round.hpp>
 //#include <boost/program_options.hpp>
 #include <boost/thread/thread.hpp>
 #include <csignal>
 #include <fstream>
+
+// Child windows
+#include "ImUsrpUiRx.h"
 
 
 class ImUsrpUi
@@ -49,6 +52,8 @@ private:
 	void render_subdev_info();
 	uhd::usrp::subdev_spec_t tx_subdev_spec, rx_subdev_spec;
 
+	void render_rx_options();
+
 	// Spare threads
 	std::thread thd;
 	bool thd_joined = true;
@@ -65,5 +70,7 @@ private:
 	void usrp_make(std::string device_addr_string);
 	bool usrp_ready = false;
 
+
+	std::vector<ImUsrpUiRx> rxwindows;
 };
 

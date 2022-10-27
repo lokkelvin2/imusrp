@@ -39,6 +39,7 @@ void ImUsrpUi::render()
 	{
 		render_usrp_info();
 		render_subdev_info();
+		render_rx_options();
 	}
 
 
@@ -73,6 +74,33 @@ void ImUsrpUi::render_subdev_info()
 	ImGui::Text(tx_subdev_spec.to_pp_string().c_str());
 	ImGui::Text("RX Details");
 	ImGui::Text(rx_subdev_spec.to_pp_string().c_str());
+}
+
+void ImUsrpUi::render_rx_options()
+{
+	if (ImGui::Button("RX"))
+	{
+		// DEFAULT RATE ARGUMENTS FOR NOW
+		usrp->set_rx_rate(240e3, 0);
+		uhd::tune_request_t tune_request(100e6, 0.0);
+		usrp->set_rx_freq(tune_request, 0);
+
+		// DEFAULT STREAM ARGUMENTS FOR NOW
+		uhd::stream_args_t stream_args("sc16", "sc16");
+		std::vector<size_t> channel_nums = { 0 };
+		stream_args.channels = channel_nums;
+		uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+
+		rxwindows.emplace_back(rx_stream);
+	}
+
+	if (rxwindows.size() > 0)
+	{
+		for (int i = 0; i < rxwindows.size(); i++)
+		{
+			rxwindows.at(i).render();
+		}
+	}
 }
 
 
