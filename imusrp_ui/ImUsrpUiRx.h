@@ -16,6 +16,7 @@
 
 #include <thread>
 #include <complex>
+#include <algorithm>
 
 class ImUsrpUiRx
 {
@@ -23,18 +24,29 @@ public:
 	ImUsrpUiRx(uhd::rx_streamer::sptr stream);
 	~ImUsrpUiRx();
 
-    //ImUsrpUiRx(const ImUsrpUiRx&) = delete;
-    //ImUsrpUiRx& operator =(const ImUsrpUiRx&) = delete;
+    // You must specify a move constructor in order to have a vector of these windows
+    // since they contain a child std::thread instance
+    ImUsrpUiRx(ImUsrpUiRx&&) = default;
 
 	void render();
+
+    void thread_process_for_plots();
 
 private:
 	uhd::rx_streamer::sptr rx_stream;
 
     // Separate threads for seamless receives
-    std::thread *thd; // pointer otherwise not copyable, hackish for now
+    std::thread thd; // for receiving alone
+    std::thread procthd; // for processing to make data for plots
+
+    // Some other settings, eventually should be in the UI
+    std::vector<size_t> channel_nums = { 0 };
+    size_t samps_per_buff = 10000; // DEFAULT FOR NOW
+    unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
 
 	// For now, copy the old rx function
+    double rxtime[2];
+    std::vector<std::complex<short>> buffers[2];
     void recv_to_buffer(
         std::vector<size_t> channel_nums,
         size_t samps_per_buff,
@@ -46,4 +58,7 @@ private:
         bool enable_size_map = false,
         bool verbose = false);
     bool stop_signal_called = false;
+
+    // Containers for plotting
+    std::vector<std::complex<float>> reimplotdata;
 };

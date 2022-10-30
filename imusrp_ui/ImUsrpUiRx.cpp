@@ -8,11 +8,14 @@ void ImUsrpUiRx::render()
     if (ImGui::Button("Start")) {
         stop_signal_called = false;
 
-        std::vector<size_t> channel_nums = { 0 }; // DEFAULT FOR NOW
-        size_t samps_per_buff = 10000; // DEFAULT FOR NOW
-        unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
+        // moved these to private member vars
+        //std::vector<size_t> channel_nums = { 0 }; // DEFAULT FOR NOW
+        //size_t samps_per_buff = 10000; // DEFAULT FOR NOW
+        //unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
+        reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
 
-        *thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
+        
+        thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
             channel_nums,
             samps_per_buff,
             num_requested_samples,
@@ -23,18 +26,25 @@ void ImUsrpUiRx::render()
             false,
             false
         );
-        thd->detach();
+        procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
+        
+        printf("Started the threads\n");
     }
 
     if (ImGui::Button("End")) {
         stop_signal_called = true;
-        //thd->join();
+        thd.join();
     }
 
 	// Create the plot
 	if (ImPlot::BeginPlot("##iqplot"))
 	{
-
+        ImPlot::PlotLine("Real",
+            (float*)reimplotdata.data() + 0,
+            reimplotdata.size(), 1.0, 0.0, 0, 0, 2 * sizeof(float));
+        ImPlot::PlotLine("Imag",
+            (float*)reimplotdata.data() + 1,
+            reimplotdata.size(), 1.0, 0.0, 0, 0, 2 * sizeof(float));
 		ImPlot::EndPlot();
 	}
 
@@ -55,9 +65,9 @@ void ImUsrpUiRx::recv_to_buffer(
     unsigned long long num_total_samps = 0;
 
     // Make a simple double buffer system
-    std::vector<std::complex<short>> buffers[2];
     buffers[0].resize(samps_per_buff);
     buffers[1].resize(samps_per_buff);
+    rxtime[0] = 0; rxtime[1] = 0;
 
     int tIdx = 0; // used for buffer index, 0 or 1
     //int bufIdx = 0; // used to index into the vector
@@ -82,7 +92,6 @@ void ImUsrpUiRx::recv_to_buffer(
     unsigned long long last_update_samps = 0;
 
     // metadata holding
-    uhd::time_spec_t rxtime;
     uhd::rx_metadata_t md;
 
     // Now create the pointer vectors, one for current, one for waiting
@@ -98,27 +107,22 @@ void ImUsrpUiRx::recv_to_buffer(
         and (time_requested == 0.0 or std::chrono::steady_clock::now() <= stop_time)) {
         const auto now = std::chrono::steady_clock::now();
 
-        printf("Reading to buffer %d\n", tIdx);
+        //printf("Reading to buffer %d\n", tIdx);
 
         // write the vector of pointers before receiving (only need to write the buff_ptrs at tIdx)	
         for (size_t i = 0; i < channel_nums.size(); i++) {
-            printf("Setting pointers for %d\n", i);
+            
             buff_ptrs[tIdx].at(i) = buffers[tIdx].data();
+            //printf("Setting pointers for %zd.. %p \n", i, buff_ptrs[tIdx].at(i));
         }
 
         size_t num_rx_samps = 
             rx_stream->recv(buff_ptrs[tIdx], samps_per_buff, md, 3.0, enable_size_map);
 
+        // read metadata for time
+        rxtime[tIdx] = md.time_spec.get_real_secs();
 
-        // =========== read the metadata
-        // std::cout << md.to_pp_string(false) << std::endl;
-        //rxtime = md.time_spec;
-        //		printf("Sec : %lld, frac sec : %.11f, samples: %zd\n", rxtime.get_full_secs(), rxtime.get_frac_secs(), num_rx_samps);
-        //		printf("Tick Count: %ld. \n", rxtime.get_tick_count(200e6));
-        //        uhd::time_spec_t timenow = usrp->get_time_now();
-        //        printf("Time from USRP: %lld, frac sec: %.11f\n", timenow.get_full_secs(), timenow.get_frac_secs()); // this line shows that the TwinRX appears to be doubling the duration (maybe because two DSPs and they added by accident? either way, using the metadata will be incorrect for the twinRX)
-                // ============================
-
+        // standard error checks that were copied
         if (md.error_code == uhd::rx_metadata_t::ERROR_CODE_TIMEOUT) {
             std::cout << boost::format("Timeout while streaming") << std::endl;
             break;
@@ -208,6 +212,30 @@ void ImUsrpUiRx::recv_to_buffer(
                 std::cout << it->first << ":\t" << it->second << std::endl;
         }
     }
+}
+
+void ImUsrpUiRx::thread_process_for_plots()
+{
+    double time = 0.0;
+    while (!stop_signal_called)
+    {
+        // check both times
+        for (int i = 0; i < 2; i++)
+        {
+            if (rxtime[i] > time)
+            {
+                // update the time
+                time = rxtime[i];
+
+                // move the data back by the buffer length
+                std::move(reimplotdata.begin() + buffers[i].size(), reimplotdata.end(), reimplotdata.begin());
+
+                // copy the data into the plotting container
+                std::copy(buffers[i].begin(), buffers[i].end(), reimplotdata.end() - buffers[i].size());
+            }
+        }
+    }
+
 }
 
 
