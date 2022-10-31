@@ -1,8 +1,5 @@
 #pragma once
 
-// Enable 32-bit indexing for implot
-#define IMGUI_USER_CONFIG "imusrp_imgui_config.h"
-
 #include "imgui.h"
 #include "implot.h"
 #include "implot_internal.h"

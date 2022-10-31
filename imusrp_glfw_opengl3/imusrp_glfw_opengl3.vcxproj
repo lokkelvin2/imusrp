@@ -131,7 +131,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;IMGUI_USER_CONFIG="imusrp_imgui_config.h";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)..\imgui\backends;$(SolutionDir)..\imgui;$(SolutionDir)..\imgui\examples\libs\glfw\include;$(SolutionDir)..\implot;$(UHD_DIR_3_15_0)\include;$(BOOST_DIR_1_72);$(SolutionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
