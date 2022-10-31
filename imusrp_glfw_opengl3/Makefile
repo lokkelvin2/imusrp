@@ -28,7 +28,7 @@ LINUX_GL_LIBS = -lGL -lpthread -luhd
 
 CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMPLOT_DIR) -I$(UHD_INSTALL_DIR)/include -I$(BOOST_INSTALL_DIR)/include -I../ImUsrpUi -I.
 CXXFLAGS += -L$(UHD_INSTALL_DIR)/lib -L$(BOOST_INSTALL_DIR)/lib
-CXXFLAGS += -g -Wall -Wformat -O3
+CXXFLAGS += -g -Wall -Wformat -O3 -DIMGUI_USER_CONFIG=\"imusrp_imgui_config.h\" # remember to escape the quotations!
 LIBS =
 
 ##---------------------------------------------------------------------
