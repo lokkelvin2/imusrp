@@ -37,14 +37,26 @@ void ImUsrpUiRx::render()
     }
 
 	// Create the plot
+    int plotdsr = reimplotdata.size() / 10000; // change divisor to number of points to show?
+    plotdsr = plotdsr > 0 ? plotdsr : 1;
 	if (ImPlot::BeginPlot("##iqplot"))
 	{
         ImPlot::PlotLine("Real",
             (float*)reimplotdata.data() + 0,
-            reimplotdata.size(), 1.0, 0.0, 0, 0, 2 * sizeof(float));
+            reimplotdata.size(), 
+            1.0, // xscale ie step 
+            0.0, // xstart ie first point
+            0, // flags
+            0, // offset (in the x-axis, not the data pointer)
+            2 * sizeof(float) * plotdsr); // stride
         ImPlot::PlotLine("Imag",
             (float*)reimplotdata.data() + 1,
-            reimplotdata.size(), 1.0, 0.0, 0, 0, 2 * sizeof(float));
+            reimplotdata.size(),
+            1.0, // xscale ie step 
+            0.0, // xstart ie first point
+            0, // flags
+            0, // offset (in the x-axis, not the data pointer)
+            2 * sizeof(float) * plotdsr); // stride
 		ImPlot::EndPlot();
 	}
 
