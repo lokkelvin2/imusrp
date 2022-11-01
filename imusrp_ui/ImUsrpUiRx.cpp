@@ -5,6 +5,9 @@ void ImUsrpUiRx::render()
 {
 	ImGui::Begin("RX Stream");
 
+    // Place all the options here?
+
+
     if (ImGui::Button("Start")) {
         reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
         // mark the boolean after resize
@@ -28,6 +31,7 @@ void ImUsrpUiRx::render()
     ImGui::SameLine();
     if (ImGui::Button("Simulate"))
     {
+        reimplotdata.resize(3 * 200000);
         stop_signal_called = false;
 
         thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
@@ -79,6 +83,9 @@ void ImUsrpUiRx::render()
 
 void ImUsrpUiRx::sim_to_buffer()
 {
+    buffers[0].resize(10000);
+    buffers[1].resize(10000);
+
     // First create an instance of an engine.
     std::random_device rnd_device;
     // Specify the engine and distribution.
@@ -96,6 +103,7 @@ void ImUsrpUiRx::sim_to_buffer()
         for (int i = 0; i < buffers[tIdx].size(); i++)
         {
             buffers[tIdx].at(i) = {dist(mt), dist(mt)};
+            // if (i < 5){printf("%hd, %hd\n", buffers[tIdx].at(i).real(), buffers[tIdx].at(i).imag());}
         }
         // std::generate(
         //     std::cbegin((short*)buffers[tIdx].data()), 

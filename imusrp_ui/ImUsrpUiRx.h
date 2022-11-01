@@ -63,7 +63,7 @@ private:
 
     // Containers for plotting
     std::vector<std::complex<double>> reimplotdata;
-    std::unique_ptr<std::mutex> mtx[3];
+    std::unique_ptr<std::mutex> mtx[3]; // as of now, don't seem to need the triple buffers?
 
     // Simulator function for testing without usrp
     void sim_to_buffer();

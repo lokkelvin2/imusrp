@@ -38,7 +38,7 @@ int main(int, char**)
     // Application-specific instantiations
     ImUsrpUi imusrpui;
     // For debugging?
-    //ImUsrpUiRx rxsim(nullptr);
+    ImUsrpUiRx rxsim(nullptr);
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -172,7 +172,7 @@ int main(int, char**)
 
         // ImUSRP Rendering
         imusrpui.render();
-        //rxsim.render();
+        rxsim.render();
 
         // Rendering
         ImGui::Render();
