@@ -18,7 +18,8 @@
 
 
 // Application-specific includes
-#include "../imusrp_ui/ImUsrpUi.h"
+#include "ImUsrpUi.h"
+#include "ImUsrpUiRx.h"
 
 // [Win32] Our example includes a copy of glfw3.lib pre-compiled with VS2010 to maximize ease of testing and compatibility with old VS compilers.
 // To link with VS2010-era libraries, VS2015+ requires linking with legacy_stdio_definitions.lib, which we do using this pragma.
@@ -36,6 +37,8 @@ int main(int, char**)
 {
     // Application-specific instantiations
     ImUsrpUi imusrpui;
+    // For debugging?
+    ImUsrpUiRx rxsim(nullptr);
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -169,6 +172,7 @@ int main(int, char**)
 
         // ImUSRP Rendering
         imusrpui.render();
+        rxsim.render();
 
         // Rendering
         ImGui::Render();

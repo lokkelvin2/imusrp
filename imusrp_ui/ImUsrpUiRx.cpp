@@ -8,12 +8,7 @@ void ImUsrpUiRx::render()
     if (ImGui::Button("Start")) {
         stop_signal_called = false;
 
-        // moved these to private member vars
-        //std::vector<size_t> channel_nums = { 0 }; // DEFAULT FOR NOW
-        //size_t samps_per_buff = 10000; // DEFAULT FOR NOW
-        //unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
         reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
-
         
         thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
             channel_nums,
@@ -30,10 +25,22 @@ void ImUsrpUiRx::render()
         
         printf("Started the threads\n");
     }
+    ImGui::SameLine();
+    if (ImGui::Button("Simulate"))
+    {
+        stop_signal_called = false;
+
+        thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
+        procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
+        
+        printf("Started the threads (simulation)\n");
+
+    }
 
     if (ImGui::Button("End")) {
         stop_signal_called = true;
         thd.join();
+        procthd.join();
     }
 
 	// Create the plot
@@ -48,7 +55,7 @@ void ImUsrpUiRx::render()
             0.0, // xstart ie first point
             0, // flags
             0, // offset (in the x-axis, not the data pointer)
-            2 * sizeof(float) * plotdsr); // stride
+            2 * sizeof(float)); // stride
         ImPlot::PlotLine("Imag",
             (float*)reimplotdata.data() + 1,
             reimplotdata.size(),
@@ -56,11 +63,46 @@ void ImUsrpUiRx::render()
             0.0, // xstart ie first point
             0, // flags
             0, // offset (in the x-axis, not the data pointer)
-            2 * sizeof(float) * plotdsr); // stride
+            2 * sizeof(float)); // stride
 		ImPlot::EndPlot();
 	}
 
 	ImGui::End();
+}
+
+void ImUsrpUiRx::sim_to_buffer()
+{
+    // First create an instance of an engine.
+    std::random_device rnd_device;
+    // Specify the engine and distribution.
+    std::mt19937 mt {rnd_device()};  // Generates random integers
+    std::uniform_int_distribution<short> dist {1, 52};
+
+    // auto gen = [&dist, &mt](){
+    //                return dist(mt);
+    //            };
+
+    int tIdx = 0;
+    int cnt = 0;
+    while (!stop_signal_called)
+    {
+        for (int i = 0; i < buffers[tIdx].size(); i++)
+        {
+            buffers[tIdx].at(i) = {dist(mt), dist(mt)};
+        }
+        // std::generate(
+        //     std::cbegin((short*)buffers[tIdx].data()), 
+        //     std::cend((short*)buffers[tIdx].data()),
+        //     gen);
+
+        std::this_thread::sleep_for(std::chrono::duration<double>(0.05));
+        printf("Simulated into buffer %d\n", tIdx);
+        rxtime[tIdx] = cnt * 0.05;
+
+        cnt++;
+        tIdx = (tIdx + 1) % 2;
+    }
+
 }
 
 void ImUsrpUiRx::recv_to_buffer(
@@ -82,7 +124,6 @@ void ImUsrpUiRx::recv_to_buffer(
     rxtime[0] = 0; rxtime[1] = 0;
 
     int tIdx = 0; // used for buffer index, 0 or 1
-    //int bufIdx = 0; // used to index into the vector
 
     bool overflow_message = true;
 
@@ -177,13 +218,10 @@ void ImUsrpUiRx::recv_to_buffer(
 
         // ============ check buffers
         printf("Buf: %d. samps recv'd: %d\n", tIdx, (int)num_rx_samps);
-        // update the new idx to write to
-        //bufIdx = bufIdx + num_rx_samps;
-        // then move to next buffer
 
         // update indices
         tIdx = (tIdx + 1) % 2;
-        //bufIdx = 0;
+
 
         // ==========================
 
@@ -238,15 +276,26 @@ void ImUsrpUiRx::thread_process_for_plots()
             {
                 // update the time
                 time = rxtime[i];
+                printf("Thread processed time %f\n", time);
 
                 // move the data back by the buffer length
                 std::move(reimplotdata.begin() + buffers[i].size(), reimplotdata.end(), reimplotdata.begin());
 
-                // copy the data into the plotting container
-                std::copy(buffers[i].begin(), buffers[i].end(), reimplotdata.end() - buffers[i].size());
+                // must use transform since the data types are different
+                std::transform(
+                    buffers[i].cbegin(),
+                    buffers[i].cend(),
+                    reimplotdata.end() - buffers[i].size(),
+                    [](std::complex<short> sc){
+                        // return static_cast<std::complex<float>>(sc); // why doesnt this work
+                        return std::complex<float>((float)sc.real(), (float)sc.imag());
+                    }
+                );
+
             }
         }
     }
+    printf("Side process thread ending\n");
 
 }
 

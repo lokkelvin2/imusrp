@@ -12,8 +12,10 @@
 //#include <uhd/utils/thread.hpp>
 
 #include <thread>
+#include <mutex>
 #include <complex>
 #include <algorithm>
+#include <random>
 
 class ImUsrpUiRx
 {
@@ -58,4 +60,8 @@ private:
 
     // Containers for plotting
     std::vector<std::complex<float>> reimplotdata;
+    std::mutex mtx[3];
+
+    // Simulator function for testing without usrp
+    void sim_to_buffer();
 };
