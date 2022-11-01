@@ -6,10 +6,10 @@ void ImUsrpUiRx::render()
 	ImGui::Begin("RX Stream");
 
     if (ImGui::Button("Start")) {
+        reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
+        // mark the boolean after resize
         stop_signal_called = false;
 
-        reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
-        
         thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
             channel_nums,
             samps_per_buff,
@@ -44,26 +44,33 @@ void ImUsrpUiRx::render()
     }
 
 	// Create the plot
-    int plotdsr = reimplotdata.size() / 10000; // change divisor to number of points to show?
+    const int numPlotPts = 3 * 10000;
+    int plotdsr = reimplotdata.size() / numPlotPts; // change divisor to number of points to show?
     plotdsr = plotdsr > 0 ? plotdsr : 1;
+    //printf("plotdsr = %d\n", plotdsr);
 	if (ImPlot::BeginPlot("##iqplot"))
 	{
-        ImPlot::PlotLine("Real",
-            (float*)reimplotdata.data() + 0,
-            reimplotdata.size(), 
-            1.0, // xscale ie step 
-            0.0, // xstart ie first point
-            0, // flags
-            0, // offset (in the x-axis, not the data pointer)
-            2 * sizeof(float)); // stride
-        ImPlot::PlotLine("Imag",
-            (float*)reimplotdata.data() + 1,
-            reimplotdata.size(),
-            1.0, // xscale ie step 
-            0.0, // xstart ie first point
-            0, // flags
-            0, // offset (in the x-axis, not the data pointer)
-            2 * sizeof(float)); // stride
+        // note, stride of PlotLine is very slow, likely need to stride externally
+        // only plot lines if its running
+        if (!stop_signal_called) {
+            ImPlot::PlotLine("Real",
+                (double*)reimplotdata.data() + 0,
+                numPlotPts, //reimplotdata.size(),
+                1.0, // xscale ie step 
+                0.0, // xstart ie first point
+                0, // flags
+                0, // offset (in the x-axis, not the data pointer)
+                2 * sizeof(double)); // *plotdsr); // stride
+            ImPlot::PlotLine("Imag",
+                (double*)reimplotdata.data() + 1,
+                numPlotPts, //reimplotdata.size(),
+                1.0, // xscale ie step 
+                0.0, // xstart ie first point
+                0, // flags
+                0, // offset (in the x-axis, not the data pointer)
+                2 * sizeof(double)); // *plotdsr); // stride
+        }
+        
 		ImPlot::EndPlot();
 	}
 
@@ -288,7 +295,7 @@ void ImUsrpUiRx::thread_process_for_plots()
                     reimplotdata.end() - buffers[i].size(),
                     [](std::complex<short> sc){
                         // return static_cast<std::complex<float>>(sc); // why doesnt this work
-                        return std::complex<float>((float)sc.real(), (float)sc.imag());
+                        return std::complex<double>((double)sc.real(), (double)sc.imag());
                     }
                 );
 
@@ -303,6 +310,12 @@ void ImUsrpUiRx::thread_process_for_plots()
 ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream)
 	: rx_stream{ stream }
 {
+    // Initialise unique ptrs of the mutexes
+    // we have to do this because mutexes are not movable/copyable
+    for (int i = 0; i < 3; i++)
+    {
+        mtx[i] = std::make_unique<std::mutex>();
+    }
 
 }
 

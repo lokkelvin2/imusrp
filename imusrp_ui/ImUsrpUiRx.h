@@ -27,6 +27,9 @@ public:
     // since they contain a child std::thread instance
     ImUsrpUiRx(ImUsrpUiRx&&) = default;
 
+    //// Disable copy ctor
+    //ImUsrpUiRx(const ImUsrpUiRx&) = delete;
+
 	void render();
 
     void thread_process_for_plots();
@@ -56,11 +59,11 @@ private:
         bool null = false,
         bool enable_size_map = false,
         bool verbose = false);
-    bool stop_signal_called = false;
+    bool stop_signal_called = true;
 
     // Containers for plotting
-    std::vector<std::complex<float>> reimplotdata;
-    std::mutex mtx[3];
+    std::vector<std::complex<double>> reimplotdata;
+    std::unique_ptr<std::mutex> mtx[3];
 
     // Simulator function for testing without usrp
     void sim_to_buffer();

@@ -38,7 +38,7 @@ int main(int, char**)
     // Application-specific instantiations
     ImUsrpUi imusrpui;
     // For debugging?
-    ImUsrpUiRx rxsim(nullptr);
+    //ImUsrpUiRx rxsim(nullptr);
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -107,7 +107,7 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
     // Our state
-    bool show_demo_window = true;
+    bool show_demo_window = false; // disable imgui demo window
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -157,22 +157,22 @@ int main(int, char**)
             ImGui::End();
         }
 
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+        //// 3. Show another simple window.
+        //if (show_another_window)
+        //{
+        //    ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+        //    ImGui::Text("Hello from another window!");
+        //    if (ImGui::Button("Close Me"))
+        //        show_another_window = false;
+        //    ImGui::End();
+        //}
 
         // ImPlot Demo
-        ImPlot::ShowDemoWindow();
+        //ImPlot::ShowDemoWindow();
 
         // ImUSRP Rendering
         imusrpui.render();
-        rxsim.render();
+        //rxsim.render();
 
         // Rendering
         ImGui::Render();
