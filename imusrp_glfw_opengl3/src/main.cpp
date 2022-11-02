@@ -33,6 +33,8 @@ static void glfw_error_callback(int error, const char* description)
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+
 int main(int, char**)
 {
     // Application-specific instantiations
@@ -172,7 +174,7 @@ int main(int, char**)
 
         // ImUSRP Rendering
         imusrpui.render();
-        rxsim.render();
+        //rxsim.render();
 
         // Rendering
         ImGui::Render();
