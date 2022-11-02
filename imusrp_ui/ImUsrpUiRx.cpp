@@ -6,6 +6,9 @@ void ImUsrpUiRx::render()
 	ImGui::Begin("RX Stream");
 
     // Display the arguments used to construct the stream
+    ImGui::Text("Sample rate: %f", m_rxrate==nullptr ? -1.0 : *m_rxrate);
+    ImGui::Text("Centre Frequency: %g", m_rxfreq==nullptr ? -1.0 : *m_rxfreq);
+    ImGui::Text("Gain: %f", m_rxgain==nullptr ? -1.0 : *m_rxgain);
     ImGui::Text("CPU format: %s", m_stream_args.cpu_format.c_str());
     ImGui::Text("Wire format: %s", m_stream_args.otw_format.c_str());
     if (ImGui::TreeNode("Channels in stream"))
@@ -30,7 +33,7 @@ void ImUsrpUiRx::render()
     if (ImGui::Button("Start")) {
         // Calculate the plot points and downsample rates
         numPlotPts = numHistorySecs * numPlotPtsPerSecond;
-        plotdsr = (int)m_rxrate / numPlotPtsPerSecond;
+        plotdsr = (int)*m_rxrate / numPlotPtsPerSecond;
         // We must make sure that this is a divisor of samps_per_buff
         if ((int)samps_per_buff % plotdsr != 0)
         {
@@ -101,10 +104,12 @@ void ImUsrpUiRx::render()
         // note, stride of PlotLine is very slow, likely need to stride externally
         // only plot lines if its running
         if (!stop_signal_called) {
+            ImPlot::SetupAxisLimits(ImAxis_X1,0,(double)numHistorySecs); //, ImGuiCond_Always);
+            ImPlot::SetupAxes("Time (s)", "Amplitude");//, ImPlotAxisFlags_Lock); //, ImPlotAxisFlags_None, ImPlotAxisFlags_AutoFit);
             ImPlot::PlotLine("Real",
                 (double*)reimplotdata.data() + 0,
                 numPlotPts, //reimplotdata.size(),
-                1.0, // xscale ie step 
+                (double)numHistorySecs / (double)numPlotPts, // xscale ie step 
                 0.0, // xstart ie first point
                 0, // flags
                 0, // offset (in the x-axis, not the data pointer)
@@ -112,7 +117,7 @@ void ImUsrpUiRx::render()
             ImPlot::PlotLine("Imag",
                 (double*)reimplotdata.data() + 1,
                 numPlotPts, //reimplotdata.size(),
-                1.0, // xscale ie step 
+                (double)numHistorySecs / (double)numPlotPts, // xscale ie step 
                 0.0, // xstart ie first point
                 0, // flags
                 0, // offset (in the x-axis, not the data pointer)
@@ -126,25 +131,29 @@ void ImUsrpUiRx::render()
     {
         if (!stop_signal_called)
         {
+            const double leftFreq = -(double)*m_rxrate / 2;
+            ImPlot::SetupAxes("Frequency (Hz)", "Power (dB)"); //, ImPlotAxisFlags_None, ImPlotAxisFlags_AutoFit);
+            ImPlot::SetupAxisLimits(ImAxis_X1, leftFreq, -leftFreq); //, ImGuiCond_Always);
             ImPlot::PlotLine("FFT",
                 spectrumdata.data(),
                 spectrumdata.size(),
-                1.0,
-                0.0,
-                0,
-                0,
-                sizeof(double)
+                *m_rxrate / (double)spectrumdata.size(), // xscale (steps)
+                leftFreq, // xstart (leftmost pt)
+                0, // flags
+                0, // offset
+                sizeof(double) // stride
             );
         }
 
         ImPlot::EndPlot();
     }
 
-     if (!stop_signal_called)
-     {
-         ImGui::Text("Processing thread: %fs", procthdtime);
-         ImGui::Text("Recv thread: %fs (%zd samples per call)", (double)samps_per_buff / m_rxrate, samps_per_buff);
-     }
+    if (!stop_signal_called)
+    {
+        ImGui::Text("Double-click to reset the axis limits");
+        ImGui::Text("Processing thread: %fs", procthdtime);
+        ImGui::Text("Recv thread: %fs (%zd samples per call)", (double)samps_per_buff / *m_rxrate, samps_per_buff);
+    }
 
 	ImGui::End();
 }
@@ -471,7 +480,7 @@ void ImUsrpUiRx::thread_process_for_plots()
 
 
 ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args,
-    double rxrate, double rxfreq, double rxgain)
+    double *rxrate, double *rxfreq, double *rxgain)
     : rx_stream{ stream }, m_stream_args{ stream_args },
     m_rxrate{ rxrate }, m_rxfreq{ rxfreq }, m_rxgain{ rxgain }
 {
@@ -486,5 +495,8 @@ ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_
 
 ImUsrpUiRx::~ImUsrpUiRx()
 {
-
+    // End the streams
+    stop_signal_called = true;
+    if (thd.joinable()){thd.join();}
+    if (procthd.joinable()){procthd.join();}
 }

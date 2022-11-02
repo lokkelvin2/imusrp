@@ -162,7 +162,10 @@ void ImUsrpUi::render_rx_options()
 			stream_args.channels = channel_nums;
 			uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
-			rxwindows.emplace_back(rx_stream, stream_args, actualrxrate, actualrxfreq, actualrxgain);
+			rxwindows.emplace_back(
+				rx_stream,
+				stream_args,
+			 	&actualrxrate, &actualrxfreq, &actualrxgain);
 
 			// Close the modal
 			ImGui::CloseCurrentPopup();

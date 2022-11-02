@@ -26,7 +26,7 @@ public:
 	ImUsrpUiRx(
         uhd::rx_streamer::sptr stream,
         uhd::stream_args_t stream_args=uhd::stream_args_t(),
-        double rxrate=0, double rxfreq=0, double rxgain=0
+        double *rxrate=nullptr, double *rxfreq=nullptr, double *rxgain=nullptr
     );
 	~ImUsrpUiRx();
 
@@ -45,7 +45,7 @@ private:
     // Constructor requirements
 	uhd::rx_streamer::sptr rx_stream;
     uhd::stream_args_t m_stream_args;
-    double m_rxrate, m_rxfreq, m_rxgain;
+    double *m_rxrate, *m_rxfreq, *m_rxgain;
 
     // Separate threads for seamless receives
     std::thread thd; // for receiving alone
@@ -57,6 +57,7 @@ private:
 
     // Some other settings, eventually should be in the UI
     int numHistorySecs = 3;
+    int numFFTbuffers = 1;
     const int numPlotPtsPerSecond = 10000; // for now, fixed due to fps issues
     int numPlotPts;
     int plotdsr = 1;
