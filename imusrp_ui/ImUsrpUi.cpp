@@ -86,7 +86,7 @@ void ImUsrpUi::render_rx_options()
 		usrp->set_rx_freq(tune_request, 0);
 
 		// Modal for stream args?
-		ImGui::BeginPopup("Initialise RX stream");
+		ImGui::OpenPopup("Initialise RX stream");
 	}
 
 	if (ImGui::BeginPopupModal("Initialise RX stream", NULL, ImGuiWindowFlags_AlwaysAutoResize))
