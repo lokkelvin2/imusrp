@@ -54,6 +54,22 @@ void ImUsrpUi::usrp_make(std::string device_addr_string)
 	usrp_pp_string = usrp->get_pp_string();
 	tx_subdev_spec = usrp->get_tx_subdev_spec();
 	rx_subdev_spec = usrp->get_rx_subdev_spec();
+	// Initial ranges
+	auto rxrate_range = usrp->get_rx_rates();
+	rxratemin = rxrate_range.start();
+	rxratemax = rxrate_range.stop();
+	rxratestep = rxrate_range.step();
+
+	auto rxfreq_range = usrp->get_rx_freq_range();
+	rxfreqmin = rxfreq_range.start();
+	rxfreqmax = rxfreq_range.stop();
+	rxfreqstep = rxfreq_range.step();
+
+	auto rxgain_range = usrp->get_rx_gain_range();
+	rxgainmin = rxgain_range.start();
+	rxgainmax = rxgain_range.stop();
+	rxgainstep = rxgain_range.step();
+	
 	// Flag it
 	usrp_ready = true;
 }
@@ -74,17 +90,56 @@ void ImUsrpUi::render_subdev_info()
 	ImGui::Text("%s", tx_subdev_spec.to_pp_string().c_str());
 	ImGui::Text("RX Details");
 	ImGui::Text("%s", rx_subdev_spec.to_pp_string().c_str());
+
+
 }
 
 void ImUsrpUi::render_rx_options()
 {
+	// Display the RX channels for just channel 0
+	const size_t chnl = 0;
+	ImGui::Text("\nChannel %zd Settings", chnl);
+
+	// Show settings
+	ImGui::Text("Ctrl-Click to type directly");
+	ImGui::SliderInt("RX Sample Rate", &rxrate, (int)rxratemin, (int)rxratemax);
+	ImGui::SliderFloat("RX Centre Frequency (Hz)", &rxfreq, (float)rxfreqmin, (float)rxfreqmax);
+	ImGui::SliderFloat("RX Gain (dB)", &rxgain, (float)rxgainmin, (float)rxgainmax);
+
+	if (ImGui::Button("Apply Settings"))
+	{
+		thd_joined = false;
+		waiting_rx_settings = true;
+		thd = std::thread(&ImUsrpUi::set_rx_options, this, chnl);
+
+		ImGui::OpenPopup("Configuring RX Channel Settings");
+	}
+	if (ImGui::BeginPopupModal("Configuring RX Channel Settings", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		if (waiting_rx_settings) {
+			ImGui::Text("Please wait while the RX channel settings are configured..");
+		}
+		else {
+			if (!thd_joined) {
+				thd.join();
+				thd_joined = true;
+			}
+
+			ImGui::Text("RX Channel settings have finished configurations.");
+			if (ImGui::Button("Ok")) { ImGui::CloseCurrentPopup(); }
+		}
+
+		ImGui::EndPopup();
+	}
+
+	// Present the actual values
+	ImGui::Text("Actual RX Sample Rate: %f", actualrxrate);
+	ImGui::Text("Actual RX Centre Frequency (Hz): %f", actualrxfreq);
+	ImGui::Text("Actual RX Gain (dB): %f", actualrxgain);
+
+
 	if (ImGui::Button("RX"))
 	{
-		// DEFAULT RATE ARGUMENTS FOR NOW
-		usrp->set_rx_rate(240e3, 0);
-		uhd::tune_request_t tune_request(100e6, 0.0);
-		usrp->set_rx_freq(tune_request, 0);
-
 		// Modal for stream args?
 		ImGui::OpenPopup("Initialise RX stream");
 	}
@@ -107,7 +162,7 @@ void ImUsrpUi::render_rx_options()
 			stream_args.channels = channel_nums;
 			uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
-			rxwindows.emplace_back(rx_stream, stream_args);
+			rxwindows.emplace_back(rx_stream, stream_args, actualrxrate, actualrxfreq, actualrxgain);
 
 			// Close the modal
 			ImGui::CloseCurrentPopup();
@@ -125,6 +180,24 @@ void ImUsrpUi::render_rx_options()
 			rxwindows.at(i).render();
 		}
 	}
+}
+
+void ImUsrpUi::set_rx_options(size_t chnl)
+{
+	usrp->set_rx_rate((double)rxrate, chnl);
+	actualrxrate = usrp->get_rx_rate(chnl);
+
+	usrp->set_rx_freq(
+		uhd::tune_request_t((double)rxfreq),
+		chnl
+	);
+	actualrxfreq = usrp->get_rx_freq(chnl);
+
+	usrp->set_rx_gain((double)rxgain, chnl);
+	actualrxgain = usrp->get_rx_gain(chnl);
+
+	// Flag that its done
+	waiting_rx_settings = false;
 }
 
 

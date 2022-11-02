@@ -134,15 +134,15 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;IMGUI_USER_CONFIG="imusrp_imgui_config.h";%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)..\imgui\backends;$(SolutionDir)..\imgui;$(SolutionDir)..\imgui\examples\libs\glfw\include;$(SolutionDir)..\implot;$(UHD_DIR_3_15_0)\include;$(BOOST_DIR_1_72);$(SolutionDir)include;$(SolutionDir)..\imusrp_ui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)..\imgui\backends;$(SolutionDir)..\imgui;$(SolutionDir)..\imgui\examples\libs\glfw\include;$(SolutionDir)..\implot;$(UHD_DIR_3_15_0)\include;$(BOOST_DIR_1_72);$(SolutionDir)include;$(SolutionDir)..\imusrp_ui;$(IPPROOT)\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(SolutionDir)..\imgui\examples\libs\glfw\lib-vc2010-64;$(BOOST_DIR_1_72)\lib64-msvc-14.2;$(UHD_DIR_3_15_0)\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>glfw3.lib;opengl32.lib;uhd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)..\imgui\examples\libs\glfw\lib-vc2010-64;$(BOOST_DIR_1_72)\lib64-msvc-14.2;$(UHD_DIR_3_15_0)\lib;$(IPPROOT)\lib\intel64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;opengl32.lib;uhd.lib;ippcore.lib;ipps.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

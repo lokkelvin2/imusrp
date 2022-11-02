@@ -52,7 +52,28 @@ private:
 	void render_subdev_info();
 	uhd::usrp::subdev_spec_t tx_subdev_spec, rx_subdev_spec;
 
+	/// <summary>
+	/// Render section for receiver controls.
+	/// </summary>
 	void render_rx_options();
+	void set_rx_options(size_t chnl);
+	bool waiting_rx_settings = false;
+	// Sample rate
+	int rxrate = 1e6;
+	double actualrxrate = 0; // actual is always double
+	double rxratemin, rxratemax, rxratestep;
+	// Frequencies
+	float rxfreq = 1e9;
+	double actualrxfreq = 0; // actual is always double
+	double rxfreqmin, rxfreqmax, rxfreqstep;
+	//// LO Offset (not sure how to get LO source name properly)
+	//double rxlo_off = 0;
+	//double actualrxlo_off;
+
+	// Gain
+	float rxgain = 0;
+	double actualrxgain = 0; // actual is always double
+	double rxgainmin, rxgainmax, rxgainstep;
 
 	// Spare threads
 	std::thread thd;

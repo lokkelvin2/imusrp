@@ -18,11 +18,16 @@
 #include <random>
 
 #include "timer.h"
+#include "ipp.h"
 
 class ImUsrpUiRx
 {
 public:
-	ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args=uhd::stream_args_t());
+	ImUsrpUiRx(
+        uhd::rx_streamer::sptr stream,
+        uhd::stream_args_t stream_args=uhd::stream_args_t(),
+        double rxrate=0, double rxfreq=0, double rxgain=0
+    );
 	~ImUsrpUiRx();
 
     // You must specify a move constructor in order to have a vector of these windows
@@ -40,7 +45,7 @@ private:
     // Constructor requirements
 	uhd::rx_streamer::sptr rx_stream;
     uhd::stream_args_t m_stream_args;
-    //std::vector<size_t> channel_nums;
+    double m_rxrate, m_rxfreq, m_rxgain;
 
     // Separate threads for seamless receives
     std::thread thd; // for receiving alone
@@ -52,13 +57,17 @@ private:
 
     // Some other settings, eventually should be in the UI
     int numHistorySecs = 3;
+    const int numPlotPtsPerSecond = 10000; // for now, fixed due to fps issues
+    int numPlotPts;
+    int plotdsr = 1;
     
     size_t samps_per_buff = 10000; // DEFAULT FOR NOW
     unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
 
 	// For now, copy the old rx function
     double rxtime[2];
-    std::vector<std::complex<short>> buffers[2];
+    std::vector<std::complex<float>> buffers[2];
+    std::vector<std::complex<float>*> buff_ptrs[2];
     void recv_to_buffer(
         std::vector<size_t> channel_nums,
         size_t samps_per_buff,

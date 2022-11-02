@@ -28,24 +28,45 @@ void ImUsrpUiRx::render()
     }
 
     if (ImGui::Button("Start")) {
-        reimplotdata.resize((size_t)numHistorySecs * 200000); // default size for now, fixed to about 3 seconds?
-        // mark the boolean after resize
-        stop_signal_called = false;
+        // Calculate the plot points and downsample rates
+        numPlotPts = numHistorySecs * numPlotPtsPerSecond;
+        plotdsr = (int)m_rxrate / numPlotPtsPerSecond;
+        // We must make sure that this is a divisor of samps_per_buff
+        if ((int)samps_per_buff % plotdsr != 0)
+        {
+            ImGui::OpenPopup("Non-divisor DSR");
+        }
+        else // if okay, start the recording
+        {
+            // We resize to the number of plot points only
+            reimplotdata.resize(numPlotPts);
+            // mark the boolean after resize
+            stop_signal_called = false;
 
-        thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
-            m_stream_args.channels, // channel_nums,
-            samps_per_buff,
-            num_requested_samples,
-            0.0,
-            false,
-            false,
-            false,
-            false,
-            false
-        );
-        procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
+            thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
+                m_stream_args.channels, // channel_nums,
+                samps_per_buff,
+                num_requested_samples,
+                0.0,
+                false,
+                false,
+                false,
+                false,
+                false
+            );
+            procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
+        }
+
+        if (ImGui::BeginPopupModal("Non-divisor DSR", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+        {
+            ImGui::Text("Plot DSR is %d, but samples received per call is %zd", plotdsr, samps_per_buff);
+            if (ImGui::Button("Ok")) { ImGui::CloseCurrentPopup(); }
+            ImGui::EndPopup();
+        }
     }
     ImGui::SameLine();
+    
+    /* SIMULATION ONLY. FOR DEBUGGING WITHOUT A USRP */
     if (ImGui::Button("Simulate"))
     {
         reimplotdata.resize(numHistorySecs * 200000);
@@ -54,6 +75,7 @@ void ImUsrpUiRx::render()
         thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
         procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
     }
+    /* END OF SIMULATION ONLY. */
 
     if (ImGui::Button("End")) {
         stop_signal_called = true;
@@ -72,9 +94,6 @@ void ImUsrpUiRx::render()
     }
 
 	// Create the plot
-    const int numPlotPts = numHistorySecs * 10000;
-    int plotdsr = reimplotdata.size() / numPlotPts; // change divisor to number of points to show?
-    plotdsr = plotdsr > 0 ? plotdsr : 1;
     ImGui::Text("Amplitude Plot Downsample Rate: %d", plotdsr);
 	if (ImPlot::BeginPlot("##iqplot"))
 	{
@@ -105,6 +124,7 @@ void ImUsrpUiRx::render()
      if (!stop_signal_called)
      {
          ImGui::Text("Processing thread: %fs", procthdtime);
+         ImGui::Text("Recv thread: %fs (%zd samples per call)", (double)samps_per_buff / m_rxrate, samps_per_buff);
      }
 
 	ImGui::End();
@@ -131,7 +151,7 @@ void ImUsrpUiRx::sim_to_buffer()
     {
         for (size_t i = 0; i < buffers[tIdx].size(); i++)
         {
-            buffers[tIdx].at(i) = {dist(mt), dist(mt)};
+            buffers[tIdx].at(i) = {(float)dist(mt), (float)dist(mt)};
             // if (i < 5){printf("%hd, %hd\n", buffers[tIdx].at(i).real(), buffers[tIdx].at(i).imag());}
         }
         // std::generate(
@@ -192,7 +212,6 @@ void ImUsrpUiRx::recv_to_buffer(
     uhd::rx_metadata_t md;
 
     // Now create the pointer vectors, one for current, one for waiting
-    std::vector<std::complex<short>*> buff_ptrs[2];
     buff_ptrs[0].resize(channel_nums.size());
     buff_ptrs[1].resize(channel_nums.size()); // we will be writing the pointers during the loop, not here
 
@@ -312,6 +331,10 @@ void ImUsrpUiRx::thread_process_for_plots()
 {
     HighResolutionTimer timer;
 
+    int numPerBatch = samps_per_buff / plotdsr;
+    // temporary workspace vectors
+    std::vector<std::complex<float>> workspace(numPerBatch);
+
     double time = 0.0;
     while (!stop_signal_called)
     {
@@ -326,31 +349,52 @@ void ImUsrpUiRx::thread_process_for_plots()
                 time = rxtime[i];
 
                 // move the data back by the buffer length
-                std::move(reimplotdata.begin() + buffers[i].size(), reimplotdata.end(), reimplotdata.begin());
+                std::move(reimplotdata.begin() + numPerBatch, reimplotdata.end(), reimplotdata.begin());
 
-                // must use transform since the data types are different
-                std::transform(
-                    buffers[i].cbegin(),
-                    buffers[i].cend(),
-                    reimplotdata.end() - buffers[i].size(),
-                    [](std::complex<short> sc){
-                        // return static_cast<std::complex<float>>(sc); // why doesnt this work
-                        return std::complex<double>((double)sc.real(), (double)sc.imag());
-                    }
+                // we now add new points from the new batch, but downsample immediately
+                int dsphase = 0;
+                int numStored;
+                ippsSampleDown_32fc(
+                    (Ipp32fc*)buffers[i].data(),
+                    (int)buffers[i].size(),
+                    (Ipp32fc*)workspace.data(),
+                    &numStored,
+                    plotdsr,
+                    &dsphase
                 );
+                if (numStored != workspace.size()) { break; } // sanity check
+
+                // Convert data type to double
+                ippsConvert_32f64f(
+                    (Ipp32f*)workspace.data(),
+                    (Ipp64f*)&reimplotdata.at(reimplotdata.size() - numPerBatch),
+                    (int)workspace.size() * 2
+                );
+
+                //// must use transform since the data types are different
+                //std::transform(
+                //    buffers[i].cbegin(),
+                //    buffers[i].cend(),
+                //    reimplotdata.end() - buffers[i].size(),
+                //    [](std::complex<float> sc){
+                //        // return static_cast<std::complex<float>>(sc); // why doesnt this work
+                //        return std::complex<double>((double)sc.real(), (double)sc.imag());
+                //    }
+                //);
 
                 // record performance
                 procthdtime = timer.stop();
             }
         }
     }
-    printf("Side process thread ending\n");
 
 }
 
 
-ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args)
-    : rx_stream{ stream }, m_stream_args{ stream_args }
+ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args,
+    double rxrate, double rxfreq, double rxgain)
+    : rx_stream{ stream }, m_stream_args{ stream_args },
+    m_rxrate{ rxrate }, m_rxfreq{ rxfreq }, m_rxgain{ rxgain }
 {
     // Initialise unique ptrs of the mutexes
     // we have to do this because mutexes are not movable/copyable
