@@ -40,6 +40,7 @@ void ImUsrpUiRx::render()
         {
             // We resize to the number of plot points only
             reimplotdata.resize(numPlotPts);
+            spectrumdata.resize(samps_per_buff);
             // mark the boolean after resize
             stop_signal_called = false;
 
@@ -120,6 +121,24 @@ void ImUsrpUiRx::render()
         
 		ImPlot::EndPlot();
 	}
+
+    if (ImPlot::BeginPlot("##fftplot"))
+    {
+        if (!stop_signal_called)
+        {
+            ImPlot::PlotLine("FFT",
+                spectrumdata.data(),
+                spectrumdata.size(),
+                1.0,
+                0.0,
+                0,
+                0,
+                sizeof(double)
+            );
+        }
+
+        ImPlot::EndPlot();
+    }
 
      if (!stop_signal_called)
      {
@@ -333,7 +352,18 @@ void ImUsrpUiRx::thread_process_for_plots()
 
     int numPerBatch = samps_per_buff / plotdsr;
     // temporary workspace vectors
-    std::vector<std::complex<float>> workspace(numPerBatch);
+    std::vector<std::complex<float>> workspace(samps_per_buff);
+    std::vector<float> workspacereal(samps_per_buff);
+
+    // prepare the IPP FFT on the entire incoming buffer
+    int sizeSpec = 0, sizeInit = 0, sizeBuf = 0;
+    int fftlen = samps_per_buff;
+    ippsDFTGetSize_C_32fc(fftlen, IPP_FFT_NODIV_BY_ANY, ippAlgHintFast, &sizeSpec, &sizeInit, &sizeBuf);
+    /* memory allocation */
+    IppsDFTSpec_C_32fc *pSpec = (IppsDFTSpec_C_32fc*)ippMalloc(sizeSpec);
+    Ipp8u* pBuffer = (Ipp8u*)ippMalloc(sizeBuf);
+    Ipp8u* pMemInit = (Ipp8u*)ippMalloc(sizeInit);
+    ippsDFTInit_C_32fc(fftlen, IPP_FFT_NODIV_BY_ANY, ippAlgHintFast, pSpec, pMemInit);
 
     double time = 0.0;
     while (!stop_signal_called)
@@ -348,6 +378,7 @@ void ImUsrpUiRx::thread_process_for_plots()
                 // update the time
                 time = rxtime[i];
 
+                /* AMPLITUDE PLOT COMPUTATIONS */
                 // move the data back by the buffer length
                 std::move(reimplotdata.begin() + numPerBatch, reimplotdata.end(), reimplotdata.begin());
 
@@ -362,31 +393,61 @@ void ImUsrpUiRx::thread_process_for_plots()
                     plotdsr,
                     &dsphase
                 );
-                if (numStored != workspace.size()) { break; } // sanity check
+                if (numStored != numPerBatch) { break; } // sanity check
 
                 // Convert data type to double
                 ippsConvert_32f64f(
                     (Ipp32f*)workspace.data(),
                     (Ipp64f*)&reimplotdata.at(reimplotdata.size() - numPerBatch),
-                    (int)workspace.size() * 2
+                    numPerBatch * 2
                 );
 
-                //// must use transform since the data types are different
-                //std::transform(
-                //    buffers[i].cbegin(),
-                //    buffers[i].cend(),
-                //    reimplotdata.end() - buffers[i].size(),
-                //    [](std::complex<float> sc){
-                //        // return static_cast<std::complex<float>>(sc); // why doesnt this work
-                //        return std::complex<double>((double)sc.real(), (double)sc.imag());
-                //    }
-                //);
+                /* SPECTRUM PLOT COMPUTATIONS */
+                ippsDFTFwd_CToC_32fc(
+                    (Ipp32fc*)buffers[i].data(),
+                    (Ipp32fc*)workspace.data(),
+                    pSpec,
+                    pBuffer
+                );
+
+                // first take abs squared
+                ippsPowerSpectr_32fc(
+                    (Ipp32fc*)workspace.data(),
+                    (Ipp32f*)workspacereal.data(),
+                    (int)workspace.size()
+                );
+                // then log10
+                ippsLog10_32f_A11(
+                    (Ipp32f*)workspacereal.data(),
+                    (Ipp32f*)workspace.data(), // we reuse the complex workspace
+                    (int)workspace.size()
+                );
+                // then * 10 for dB
+                ippsMulC_32f(
+                    (Ipp32f*)workspace.data(),
+                    10.0f,
+                    (Ipp32f*)workspacereal.data(),
+                    (int)workspace.size()
+                );
+
+                // Convert data type to double as well
+                ippsConvert_32f64f(
+                    (Ipp32f*)workspacereal.data(),
+                    (Ipp64f*)spectrumdata.data(),
+                    spectrumdata.size()
+                );
+
 
                 // record performance
                 procthdtime = timer.stop();
             }
         }
     }
+
+    // clearing up
+    ippFree(pSpec);
+    ippFree(pBuffer);
+    ippFree(pMemInit);
 
 }
 

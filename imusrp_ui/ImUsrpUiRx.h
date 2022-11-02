@@ -82,6 +82,7 @@ private:
 
     // Containers for plotting
     std::vector<std::complex<double>> reimplotdata;
+    std::vector<double> spectrumdata;
     std::vector<double> ampplotdata;
     std::unique_ptr<std::mutex> mtx[3]; // as of now, don't seem to need the triple buffers?
 
