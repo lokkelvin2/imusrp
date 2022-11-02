@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <random>
 
+#include "timer.h"
+
 class ImUsrpUiRx
 {
 public:
@@ -40,6 +42,10 @@ private:
     // Separate threads for seamless receives
     std::thread thd; // for receiving alone
     std::thread procthd; // for processing to make data for plots
+
+    // Performance metrics
+    double procthdtime = 0;
+    double thdtime = 0;
 
     // Some other settings, eventually should be in the UI
     std::vector<size_t> channel_nums = { 0 };

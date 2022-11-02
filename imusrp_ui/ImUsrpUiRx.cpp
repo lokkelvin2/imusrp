@@ -78,6 +78,11 @@ void ImUsrpUiRx::render()
 		ImPlot::EndPlot();
 	}
 
+    // if (!stop_signal_called)
+    // {
+    //     ImGui::Text("Processing thread: %fs", procthdtime);
+    // }
+
 	ImGui::End();
 }
 
@@ -100,7 +105,7 @@ void ImUsrpUiRx::sim_to_buffer()
     int cnt = 0;
     while (!stop_signal_called)
     {
-        for (int i = 0; i < buffers[tIdx].size(); i++)
+        for (size_t i = 0; i < buffers[tIdx].size(); i++)
         {
             buffers[tIdx].at(i) = {dist(mt), dist(mt)};
             // if (i < 5){printf("%hd, %hd\n", buffers[tIdx].at(i).real(), buffers[tIdx].at(i).imag());}
@@ -281,6 +286,8 @@ void ImUsrpUiRx::recv_to_buffer(
 
 void ImUsrpUiRx::thread_process_for_plots()
 {
+    HighResolutionTimer timer;
+
     double time = 0.0;
     while (!stop_signal_called)
     {
@@ -289,6 +296,8 @@ void ImUsrpUiRx::thread_process_for_plots()
         {
             if (rxtime[i] > time)
             {
+                timer.start();
+
                 // update the time
                 time = rxtime[i];
                 printf("Thread processed time %f\n", time);
@@ -307,6 +316,8 @@ void ImUsrpUiRx::thread_process_for_plots()
                     }
                 );
 
+                // record performance
+                procthdtime = timer.stop();
             }
         }
     }

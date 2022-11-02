@@ -85,13 +85,33 @@ void ImUsrpUi::render_rx_options()
 		uhd::tune_request_t tune_request(100e6, 0.0);
 		usrp->set_rx_freq(tune_request, 0);
 
-		// DEFAULT STREAM ARGUMENTS FOR NOW
-		uhd::stream_args_t stream_args("sc16", "sc16");
-		std::vector<size_t> channel_nums = { 0 };
-		stream_args.channels = channel_nums;
-		uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+		// Modal for stream args?
+		ImGui::BeginPopup("Initialise RX stream");
+	}
 
-		rxwindows.emplace_back(rx_stream);
+	if (ImGui::BeginPopupModal("Initialise RX stream", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Combo("Wire format", &wirefmtidx, wirefmts,  IM_ARRAYSIZE(wirefmts));
+		ImGui::Combo("CPU format", &cpufmtidx, cpufmts,  IM_ARRAYSIZE(cpufmts));
+
+		if (ImGui::Button("Open RX Stream"))
+		{
+			// Construct whatever format was selected
+			printf("%s, %s\n", wirefmts[wirefmtidx], cpufmts[cpufmtidx]);
+			uhd::stream_args_t stream_args(
+				wirefmts[wirefmtidx],
+				cpufmts[cpufmtidx]
+			);
+			// For now, restrict to single channel
+			ImGui::Text("For now, we will only be using channel 0. Configurations come later..");
+			std::vector<size_t> channel_nums = { 0 };
+			stream_args.channels = channel_nums;
+			uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+
+			rxwindows.emplace_back(rx_stream);
+		}
+
+		ImGui::EndPopup();
 	}
 
 	if (rxwindows.size() > 0)
