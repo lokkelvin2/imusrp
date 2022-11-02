@@ -73,7 +73,7 @@ private:
 
 	// Stream setups
 	const char *wirefmts[2] = {"sc16", "sc8"};
-	const char *cpufmts[4] = {"fc32", "fc64", "sc16", "sc8"};
+	const char *cpufmts[4] = { "sc16", "sc8", "fc32", "fc64"};
 	int wirefmtidx = 0;
 	int cpufmtidx = 0;
 

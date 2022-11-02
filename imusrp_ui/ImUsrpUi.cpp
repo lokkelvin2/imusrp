@@ -94,22 +94,26 @@ void ImUsrpUi::render_rx_options()
 		ImGui::Combo("Wire format", &wirefmtidx, wirefmts,  IM_ARRAYSIZE(wirefmts));
 		ImGui::Combo("CPU format", &cpufmtidx, cpufmts,  IM_ARRAYSIZE(cpufmts));
 
+		ImGui::Text("For now, we will only be using channel 0. Configurations come later..");
 		if (ImGui::Button("Open RX Stream"))
 		{
 			// Construct whatever format was selected
-			printf("%s, %s\n", wirefmts[wirefmtidx], cpufmts[cpufmtidx]);
 			uhd::stream_args_t stream_args(
-				wirefmts[wirefmtidx],
-				cpufmts[cpufmtidx]
+				cpufmts[cpufmtidx],
+				wirefmts[wirefmtidx]
 			);
 			// For now, restrict to single channel
-			ImGui::Text("For now, we will only be using channel 0. Configurations come later..");
 			std::vector<size_t> channel_nums = { 0 };
 			stream_args.channels = channel_nums;
 			uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
-			rxwindows.emplace_back(rx_stream);
+			rxwindows.emplace_back(rx_stream, stream_args);
+
+			// Close the modal
+			ImGui::CloseCurrentPopup();
 		}
+		// Close the modal regardless
+		if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
 
 		ImGui::EndPopup();
 	}

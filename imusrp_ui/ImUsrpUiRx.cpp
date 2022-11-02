@@ -5,16 +5,35 @@ void ImUsrpUiRx::render()
 {
 	ImGui::Begin("RX Stream");
 
-    // Place all the options here?
+    // Display the arguments used to construct the stream
+    ImGui::Text("CPU format: %s", m_stream_args.cpu_format.c_str());
+    ImGui::Text("Wire format: %s", m_stream_args.otw_format.c_str());
+    if (ImGui::TreeNode("Channels in stream"))
+    {
+        for (auto chnl : m_stream_args.channels)
+        {
+            ImGui::BulletText("%zd", chnl);
+        }
+        ImGui::TreePop();
+    }
 
+    // Place all the options here?
+    if (stop_signal_called)
+    {
+        ImGui::SliderInt("History length (seconds)", &numHistorySecs, 1, 10);
+    }
+    else 
+    {
+        ImGui::Text("History length (seconds): %d", numHistorySecs);
+    }
 
     if (ImGui::Button("Start")) {
-        reimplotdata.resize(3 * 200000); // default size for now, fixed to about 3 seconds?
+        reimplotdata.resize((size_t)numHistorySecs * 200000); // default size for now, fixed to about 3 seconds?
         // mark the boolean after resize
         stop_signal_called = false;
 
         thd = std::thread(&ImUsrpUiRx::recv_to_buffer, this,
-            channel_nums,
+            m_stream_args.channels, // channel_nums,
             samps_per_buff,
             num_requested_samples,
             0.0,
@@ -25,33 +44,38 @@ void ImUsrpUiRx::render()
             false
         );
         procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
-        
-        printf("Started the threads\n");
     }
     ImGui::SameLine();
     if (ImGui::Button("Simulate"))
     {
-        reimplotdata.resize(3 * 200000);
+        reimplotdata.resize(numHistorySecs * 200000);
         stop_signal_called = false;
 
         thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
         procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
-        
-        printf("Started the threads (simulation)\n");
-
     }
 
     if (ImGui::Button("End")) {
         stop_signal_called = true;
         thd.join();
         procthd.join();
+
+        ImGui::OpenPopup("Stream Ended Safely");
+    }
+
+    if (ImGui::BeginPopupModal("Stream Ended Safely", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::Text("Receiver and processor threads have ended safely.");
+        if (ImGui::Button("Ok")) { ImGui::CloseCurrentPopup(); }
+
+        ImGui::EndPopup();
     }
 
 	// Create the plot
-    const int numPlotPts = 3 * 10000;
+    const int numPlotPts = numHistorySecs * 10000;
     int plotdsr = reimplotdata.size() / numPlotPts; // change divisor to number of points to show?
     plotdsr = plotdsr > 0 ? plotdsr : 1;
-    //printf("plotdsr = %d\n", plotdsr);
+    ImGui::Text("Amplitude Plot Downsample Rate: %d", plotdsr);
 	if (ImPlot::BeginPlot("##iqplot"))
 	{
         // note, stride of PlotLine is very slow, likely need to stride externally
@@ -78,10 +102,10 @@ void ImUsrpUiRx::render()
 		ImPlot::EndPlot();
 	}
 
-    // if (!stop_signal_called)
-    // {
-    //     ImGui::Text("Processing thread: %fs", procthdtime);
-    // }
+     if (!stop_signal_called)
+     {
+         ImGui::Text("Processing thread: %fs", procthdtime);
+     }
 
 	ImGui::End();
 }
@@ -300,7 +324,6 @@ void ImUsrpUiRx::thread_process_for_plots()
 
                 // update the time
                 time = rxtime[i];
-                printf("Thread processed time %f\n", time);
 
                 // move the data back by the buffer length
                 std::move(reimplotdata.begin() + buffers[i].size(), reimplotdata.end(), reimplotdata.begin());
@@ -326,8 +349,8 @@ void ImUsrpUiRx::thread_process_for_plots()
 }
 
 
-ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream)
-	: rx_stream{ stream }
+ImUsrpUiRx::ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args)
+    : rx_stream{ stream }, m_stream_args{ stream_args }
 {
     // Initialise unique ptrs of the mutexes
     // we have to do this because mutexes are not movable/copyable

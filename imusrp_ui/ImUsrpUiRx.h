@@ -22,7 +22,7 @@
 class ImUsrpUiRx
 {
 public:
-	ImUsrpUiRx(uhd::rx_streamer::sptr stream);
+	ImUsrpUiRx(uhd::rx_streamer::sptr stream, uhd::stream_args_t stream_args=uhd::stream_args_t());
 	~ImUsrpUiRx();
 
     // You must specify a move constructor in order to have a vector of these windows
@@ -37,7 +37,10 @@ public:
     void thread_process_for_plots();
 
 private:
+    // Constructor requirements
 	uhd::rx_streamer::sptr rx_stream;
+    uhd::stream_args_t m_stream_args;
+    //std::vector<size_t> channel_nums;
 
     // Separate threads for seamless receives
     std::thread thd; // for receiving alone
@@ -48,7 +51,8 @@ private:
     double thdtime = 0;
 
     // Some other settings, eventually should be in the UI
-    std::vector<size_t> channel_nums = { 0 };
+    int numHistorySecs = 3;
+    
     size_t samps_per_buff = 10000; // DEFAULT FOR NOW
     unsigned long long num_requested_samples = 0; // DEFAULT FOR NOW
 
@@ -69,6 +73,7 @@ private:
 
     // Containers for plotting
     std::vector<std::complex<double>> reimplotdata;
+    std::vector<double> ampplotdata;
     std::unique_ptr<std::mutex> mtx[3]; // as of now, don't seem to need the triple buffers?
 
     // Simulator function for testing without usrp
