@@ -26,7 +26,7 @@ OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 UNAME_S := $(shell uname -s)
 LINUX_GL_LIBS = -lGL -lpthread -luhd
 
-CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMPLOT_DIR) -I$(UHD_INSTALL_DIR)/include -I$(BOOST_INSTALL_DIR)/include -I../imusrp_ui -I.
+CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMPLOT_DIR) -I$(UHD_INSTALL_DIR)/include -I$(BOOST_INSTALL_DIR)/include -I../imusrp_ui -I./include
 CXXFLAGS += -L$(UHD_INSTALL_DIR)/lib -L$(BOOST_INSTALL_DIR)/lib
 CXXFLAGS += -g -Wall -Wformat -O3 -DIMGUI_USER_CONFIG=\"imusrp_imgui_config.h\" # remember to escape the quotations!
 LIBS =

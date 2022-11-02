@@ -61,7 +61,7 @@ void ImUsrpUi::usrp_make(std::string device_addr_string)
 void ImUsrpUi::render_usrp_info()
 {
 	if (ImGui::Button("Refresh USRP Info")) { usrp_pp_string = usrp->get_pp_string(); }
-	ImGui::Text(usrp_pp_string.c_str());
+	ImGui::Text("%s", usrp_pp_string.c_str());
 }
 
 void ImUsrpUi::render_subdev_info()
@@ -71,9 +71,9 @@ void ImUsrpUi::render_subdev_info()
 		rx_subdev_spec = usrp->get_rx_subdev_spec();
 	}
 	ImGui::Text("TX Details");
-	ImGui::Text(tx_subdev_spec.to_pp_string().c_str());
+	ImGui::Text("%s", tx_subdev_spec.to_pp_string().c_str());
 	ImGui::Text("RX Details");
-	ImGui::Text(rx_subdev_spec.to_pp_string().c_str());
+	ImGui::Text("%s", rx_subdev_spec.to_pp_string().c_str());
 }
 
 void ImUsrpUi::render_rx_options()
@@ -96,7 +96,7 @@ void ImUsrpUi::render_rx_options()
 
 	if (rxwindows.size() > 0)
 	{
-		for (int i = 0; i < rxwindows.size(); i++)
+		for (size_t i = 0; i < rxwindows.size(); i++)
 		{
 			rxwindows.at(i).render();
 		}
