@@ -430,6 +430,24 @@ void ImUsrpUiRx::thread_process_for_plots()
                     (int)workspace.size()
                 );
 
+                // fftshift (assume even valued size)
+                ippsCopy_32f(
+                    (Ipp32f*)workspacereal.data(), 
+                    (Ipp32f*)workspace.data(), // again reuse the complex workspace
+                    (int)workspace.size()/2
+                ); // copy left half out
+                ippsCopy_32f(
+                    (Ipp32f*)&workspacereal.at(workspace.size()/2),
+                    (Ipp32f*)&workspacereal.at(0),
+                    (int)workspace.size()/2
+                ); // move right half to left
+                ippsCopy_32f(
+                    (Ipp32f*)workspace.data(),
+                    (Ipp32f*)&workspacereal.at(workspace.size()/2),
+                    (int)workspace.size()/2
+                ); // copy left half to right
+                
+
                 // Convert data type to double as well
                 ippsConvert_32f64f(
                     (Ipp32f*)workspacereal.data(),

@@ -24,10 +24,10 @@ SOURCES += $(IMPLOT_DIR)/implot_demo.cpp $(IMPLOT_DIR)/implot_items.cpp $(IMPLOT
 SOURCES += ../imusrp_ui/ImUsrpUi.cpp ../imusrp_ui/ImUsrpUiRx.cpp
 OBJS = $(addsuffix .o, $(basename $(notdir $(SOURCES))))
 UNAME_S := $(shell uname -s)
-LINUX_GL_LIBS = -lGL -lpthread -luhd
+LINUX_GL_LIBS = -lGL -lpthread -luhd -lippcore -lipps -lippvm
 
-CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMPLOT_DIR) -I$(UHD_INSTALL_DIR)/include -I$(BOOST_INSTALL_DIR)/include -I../imusrp_ui -I./include
-CXXFLAGS += -L$(UHD_INSTALL_DIR)/lib -L$(BOOST_INSTALL_DIR)/lib
+CXXFLAGS = -std=c++17 -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -I$(IMPLOT_DIR) -I$(UHD_INSTALL_DIR)/include -I$(BOOST_INSTALL_DIR)/include -I../imusrp_ui -I./include -I$(IPPROOT)/include
+CXXFLAGS += -L$(UHD_INSTALL_DIR)/lib -L$(BOOST_INSTALL_DIR)/lib -L$(IPPROOT)/lib/intel64
 CXXFLAGS += -g -Wall -Wformat -O3 -DIMGUI_USER_CONFIG=\"imusrp_imgui_config.h\" # remember to escape the quotations!
 LIBS =
 

@@ -80,7 +80,7 @@ private:
 	bool thd_joined = true;
 
 	// USRP object
-	char device_addr_string[64];
+	char device_addr_string[64] = "";
 	uhd::usrp::multi_usrp::sptr usrp;
 	
 
