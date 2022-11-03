@@ -58,14 +58,12 @@ int main(int, char**)
     // spin while waiting
     bool usrp_connected = false;
     
-
-    printf("Before while loop %d\n", to_make_usrp);
-    int ctr = 0;
+    // printf("Before while loop %d\n", to_make_usrp);
     while (!usrp_connected)
     {
         //if (ctr == 0) { printf("first %d\n", to_make_usrp); }
         //printf("ctr = %d\n", ctr);
-        ctr++;
+        // ctr++;
         //printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
 
         // the below thread never works if not sleeping??
@@ -74,14 +72,19 @@ int main(int, char**)
         if (to_make_usrp) // == 1)
         {
             /*printf("ctr %d\n", ctr);*/
-            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-            printf("class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
-            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+            // printf("class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
 
             imusrpui->usrp = uhd::usrp::multi_usrp::make(std::string(imusrpui->device_addr_string));
+            // Populate initial information
+            imusrpui->usrp_initialinfo();
+            // Flag it
+            imusrpui->usrp_ready = true;
 
             usrp_connected = true;
+            to_make_usrp = 0; // set back to 0 to flag the UI
             break;
         }
         //else

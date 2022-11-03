@@ -11,35 +11,47 @@ void ImUsrpUi::render()
 	ImGui::InputText("Device Address", device_addr_string, 64);
 	if (ImGui::Button("Connect to USRP"))
 	{
-		thd_joined = false;
-		thd = std::thread(&ImUsrpUi::usrp_make, this, std::string(device_addr_string));
+		// thd_joined = false;
+		// thd = std::thread(&ImUsrpUi::usrp_make, this, std::string(device_addr_string));
+
+		//// Signal main thread to make?
+		//printf("before signalling, %d\n", *to_make_usrp);
+		*to_make_usrp = 1; //  true;
+		//printf("signalled main thread? %d\n", *to_make_usrp);
 
 		ImGui::OpenPopup("Initialising USRP..");
 
 		//// Freezes the GUI
 		//usrp_make(std::string(device_addr_string));
-
-		//// Signal main thread to make?
-		//printf("before signalling, %d\n", *to_make_usrp);
-		//*to_make_usrp = 1; //  true;
-		//printf("signalled main thread? %d\n", *to_make_usrp);
 	}
 
 	if (ImGui::BeginPopupModal("Initialising USRP..", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
+		// // Deprecated
+		// if (usrp_ready)
+		// {
+		// 	if (!thd_joined) {
+		// 		thd.join();
+		// 		thd_joined = true;
+		// 	}
+		// 	ImGui::Text("USRP is connected.");
+		// 	if (ImGui::Button("Ok", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+		// }
+		// else
+		// {
+		// 	ImGui::Text("Please wait while the USRP is being initialised..");
+		// }
+		// // =========
 
-		if (usrp_ready)
+		// New code where usrp is constructed in main thread
+		if (*to_make_usrp == 1)
 		{
-			if (!thd_joined) {
-				thd.join();
-				thd_joined = true;
-			}
-			ImGui::Text("USRP is connected.");
-			if (ImGui::Button("Ok", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
+			ImGui::Text("Please wait while the USRP is being initialised..");
 		}
 		else
 		{
-			ImGui::Text("Please wait while the USRP is being initialised..");
+			ImGui::Text("USRP is connected.");
+			if (ImGui::Button("Ok", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
 		}
 
 		ImGui::EndPopup();
@@ -65,33 +77,38 @@ void ImUsrpUi::usrp_make(std::string device_addr_string)
 	//usrp->set_clock_source("internal");
 	//usrp->set_time_source("internal");
 
-	//// Collect initial information
-	//usrp_pp_string = usrp->get_pp_string();
-	//tx_subdev_spec = usrp->get_tx_subdev_spec();
-	//rx_subdev_spec = usrp->get_rx_subdev_spec();
-	//// Initial ranges
-	//auto rxrate_range = usrp->get_rx_rates();
-	//rxratemin = rxrate_range.start();
-	//rxratemax = rxrate_range.stop();
-	//rxratestep = rxrate_range.step();
+	usrp_initialinfo();
 
-	//auto rxfreq_range = usrp->get_rx_freq_range();
-	//rxfreqmin = rxfreq_range.start();
-	//rxfreqmax = rxfreq_range.stop();
-	//rxfreqstep = rxfreq_range.step();
-
-	//auto rxgain_range = usrp->get_rx_gain_range();
-	//rxgainmin = rxgain_range.start();
-	//rxgainmax = rxgain_range.stop();
-	//rxgainstep = rxgain_range.step();
-	
 	// Flag it
 	usrp_ready = true;
 
-	while (keep_make_thd_alive)
-	{
+	// while (keep_make_thd_alive)
+	// {
 
-	}
+	// }
+}
+
+void ImUsrpUi::usrp_initialinfo()
+{
+	// Collect initial information
+	usrp_pp_string = usrp->get_pp_string();
+	tx_subdev_spec = usrp->get_tx_subdev_spec();
+	rx_subdev_spec = usrp->get_rx_subdev_spec();
+	// Initial ranges
+	auto rxrate_range = usrp->get_rx_rates();
+	rxratemin = rxrate_range.start();
+	rxratemax = rxrate_range.stop();
+	rxratestep = rxrate_range.step();
+
+	auto rxfreq_range = usrp->get_rx_freq_range();
+	rxfreqmin = rxfreq_range.start();
+	rxfreqmax = rxfreq_range.stop();
+	rxfreqstep = rxfreq_range.step();
+
+	auto rxgain_range = usrp->get_rx_gain_range();
+	rxgainmin = rxgain_range.start();
+	rxgainmax = rxgain_range.stop();
+	rxgainstep = rxgain_range.step();
 }
 
 void ImUsrpUi::render_usrp_info()

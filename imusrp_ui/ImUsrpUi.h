@@ -39,9 +39,13 @@ public:
 
 	// This is the flag to command the main thread?
 	volatile int *to_make_usrp;
+	bool usrp_ready = false;
 	// USRP object
 	uhd::usrp::multi_usrp::sptr usrp;
 	char device_addr_string[64] = "";
+
+	// Collect initial info like min/max ranges
+	void usrp_initialinfo();
 
 private:
 	const char *m_windowname = "ImUSRP";
@@ -94,7 +98,7 @@ private:
 	/// </summary>
 	/// <param name="device_addr_string">Device address string</param>
 	void usrp_make(std::string device_addr_string);
-	bool usrp_ready = false;
+	// bool usrp_ready = false; // moved to public
 	
 
 
