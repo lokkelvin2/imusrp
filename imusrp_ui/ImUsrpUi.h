@@ -10,15 +10,15 @@
 #include <uhd/exception.hpp>
 #include <uhd/types/tune_request.hpp>
 #include <uhd/usrp/multi_usrp.hpp>
-#include <uhd/utils/safe_main.hpp>
-#include <uhd/utils/static.hpp>
-#include <uhd/utils/thread.hpp>
+//#include <uhd/utils/safe_main.hpp>
+//#include <uhd/utils/static.hpp>
+//#include <uhd/utils/thread.hpp>
 //#include <boost/algorithm/string.hpp>
 //#include <boost/filesystem.hpp>
-#include <boost/format.hpp>
-#include <boost/math/special_functions/round.hpp>
+//#include <boost/format.hpp>
+//#include <boost/math/special_functions/round.hpp>
 //#include <boost/program_options.hpp>
-#include <boost/thread/thread.hpp>
+//#include <boost/thread/thread.hpp>
 #include <csignal>
 #include <fstream>
 
@@ -29,13 +29,19 @@
 class ImUsrpUi
 {
 public:
-	ImUsrpUi();
+	ImUsrpUi(volatile int* make_usrp_flag);
 	~ImUsrpUi();
 
 	/// <summary>
 	/// Primary render method. Called in the event loop.
 	/// </summary>
 	void render();
+
+	// This is the flag to command the main thread?
+	volatile int *to_make_usrp;
+	// USRP object
+	uhd::usrp::multi_usrp::sptr usrp;
+	char device_addr_string[64] = "";
 
 private:
 	const char *m_windowname = "ImUSRP";
@@ -78,10 +84,9 @@ private:
 	// Spare threads
 	std::thread thd;
 	bool thd_joined = true;
+	bool keep_make_thd_alive = true;
 
-	// USRP object
-	char device_addr_string[64] = "";
-	uhd::usrp::multi_usrp::sptr usrp;
+
 	
 
 	/// <summary>
@@ -90,6 +95,7 @@ private:
 	/// <param name="device_addr_string">Device address string</param>
 	void usrp_make(std::string device_addr_string);
 	bool usrp_ready = false;
+	
 
 
 	// Stream setups
@@ -97,6 +103,7 @@ private:
 	const char *cpufmts[4] = {"fc32", "fc64", "sc16", "sc8"};
 	int wirefmtidx = 0;
 	int cpufmtidx = 0;
+	char stream_err[256] = "";
 
 	std::vector<ImUsrpUiRx> rxwindows;
 };

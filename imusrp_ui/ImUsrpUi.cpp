@@ -4,6 +4,9 @@ void ImUsrpUi::render()
 {
 	ImGui::Begin(m_windowname);
 
+	// DEBUGGING
+	//printf("FROM RENDER -> %d, Addr: %p\n", *to_make_usrp, to_make_usrp);
+
 	// Widgets go here
 	ImGui::InputText("Device Address", device_addr_string, 64);
 	if (ImGui::Button("Connect to USRP"))
@@ -12,6 +15,14 @@ void ImUsrpUi::render()
 		thd = std::thread(&ImUsrpUi::usrp_make, this, std::string(device_addr_string));
 
 		ImGui::OpenPopup("Initialising USRP..");
+
+		//// Freezes the GUI
+		//usrp_make(std::string(device_addr_string));
+
+		//// Signal main thread to make?
+		//printf("before signalling, %d\n", *to_make_usrp);
+		//*to_make_usrp = 1; //  true;
+		//printf("signalled main thread? %d\n", *to_make_usrp);
 	}
 
 	if (ImGui::BeginPopupModal("Initialising USRP..", NULL, ImGuiWindowFlags_AlwaysAutoResize))
@@ -50,28 +61,37 @@ void ImUsrpUi::render()
 void ImUsrpUi::usrp_make(std::string device_addr_string)
 {
 	usrp = uhd::usrp::multi_usrp::make(device_addr_string);
-	// Collect initial information
-	usrp_pp_string = usrp->get_pp_string();
-	tx_subdev_spec = usrp->get_tx_subdev_spec();
-	rx_subdev_spec = usrp->get_rx_subdev_spec();
-	// Initial ranges
-	auto rxrate_range = usrp->get_rx_rates();
-	rxratemin = rxrate_range.start();
-	rxratemax = rxrate_range.stop();
-	rxratestep = rxrate_range.step();
+	//// Lock clocks (TODO: allow ref changes)
+	//usrp->set_clock_source("internal");
+	//usrp->set_time_source("internal");
 
-	auto rxfreq_range = usrp->get_rx_freq_range();
-	rxfreqmin = rxfreq_range.start();
-	rxfreqmax = rxfreq_range.stop();
-	rxfreqstep = rxfreq_range.step();
+	//// Collect initial information
+	//usrp_pp_string = usrp->get_pp_string();
+	//tx_subdev_spec = usrp->get_tx_subdev_spec();
+	//rx_subdev_spec = usrp->get_rx_subdev_spec();
+	//// Initial ranges
+	//auto rxrate_range = usrp->get_rx_rates();
+	//rxratemin = rxrate_range.start();
+	//rxratemax = rxrate_range.stop();
+	//rxratestep = rxrate_range.step();
 
-	auto rxgain_range = usrp->get_rx_gain_range();
-	rxgainmin = rxgain_range.start();
-	rxgainmax = rxgain_range.stop();
-	rxgainstep = rxgain_range.step();
+	//auto rxfreq_range = usrp->get_rx_freq_range();
+	//rxfreqmin = rxfreq_range.start();
+	//rxfreqmax = rxfreq_range.stop();
+	//rxfreqstep = rxfreq_range.step();
+
+	//auto rxgain_range = usrp->get_rx_gain_range();
+	//rxgainmin = rxgain_range.start();
+	//rxgainmax = rxgain_range.stop();
+	//rxgainstep = rxgain_range.step();
 	
 	// Flag it
 	usrp_ready = true;
+
+	while (keep_make_thd_alive)
+	{
+
+	}
 }
 
 void ImUsrpUi::render_usrp_info()
@@ -150,6 +170,7 @@ void ImUsrpUi::render_rx_options()
 		ImGui::Combo("CPU format", &cpufmtidx, cpufmts,  IM_ARRAYSIZE(cpufmts));
 
 		ImGui::Text("For now, we will only be using channel 0. Configurations come later..");
+		ImGui::Text("%s", stream_err);
 		if (ImGui::Button("Open RX Stream"))
 		{
 			// Construct whatever format was selected
@@ -160,15 +181,23 @@ void ImUsrpUi::render_rx_options()
 			// For now, restrict to single channel
 			std::vector<size_t> channel_nums = { 0 };
 			stream_args.channels = channel_nums;
-			uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
+			try
+			{
+				uhd::rx_streamer::sptr rx_stream = usrp->get_rx_stream(stream_args);
 
-			rxwindows.emplace_back(
-				rx_stream,
-				stream_args,
-			 	&actualrxrate, &actualrxfreq, &actualrxgain);
+				rxwindows.emplace_back(
+					rx_stream,
+					stream_args,
+					&actualrxrate, &actualrxfreq, &actualrxgain);
 
-			// Close the modal
-			ImGui::CloseCurrentPopup();
+				// Close the modal
+				ImGui::CloseCurrentPopup();
+			}
+			catch (std::runtime_error e)
+			{
+				snprintf(stream_err, 256, "%s", e.what());
+			}
+
 		}
 		// Close the modal regardless
 		if (ImGui::Button("Cancel")) { ImGui::CloseCurrentPopup(); }
@@ -204,7 +233,8 @@ void ImUsrpUi::set_rx_options(size_t chnl)
 }
 
 
-ImUsrpUi::ImUsrpUi()
+ImUsrpUi::ImUsrpUi(volatile int *make_usrp_flag)
+	: to_make_usrp{ make_usrp_flag }
 {
 
 }

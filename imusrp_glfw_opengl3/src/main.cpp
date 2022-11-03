@@ -32,21 +32,88 @@ static void glfw_error_callback(int error, const char* description)
 {
     fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
-#if defined(_MSC_VER)
-#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
-#endif
+// this disables the console (somehow the subsystem in project config doesn't)
+//#if defined(_MSC_VER)
+//#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
+//#endif
+
+#include <thread>
+#include <uhd/usrp/multi_usrp.hpp>
+
+// forward declaration
+void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui);
 
 int main(int, char**)
 {
     // Application-specific instantiations
-    ImUsrpUi imusrpui;
+    volatile int to_make_usrp = 0;
+    // NOTE: MAKE SURE THIS IS VOLATILE. OR ELSE YOU MUST DISABLE /O2 or /O1 optimizations for it to work!
+    // LIKELY THAT /Og IS THE CULPRIT.
+    // UNKNOWN WHETHER GCC SUFFERS FROM THE SAME ISSUE.
+
+    std::shared_ptr<ImUsrpUi> imusrpui= std::make_shared<ImUsrpUi>(&to_make_usrp);
+
+    std::thread uithrd(thread_imgui, imusrpui);
+
+    // spin while waiting
+    bool usrp_connected = false;
+    
+
+    printf("Before while loop %d\n", to_make_usrp);
+    int ctr = 0;
+    while (!usrp_connected)
+    {
+        //if (ctr == 0) { printf("first %d\n", to_make_usrp); }
+        //printf("ctr = %d\n", ctr);
+        ctr++;
+        //printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+
+        // the below thread never works if not sleeping??
+        //std::this_thread::sleep_for(std::chrono::duration<double>(1.0));
+
+        if (to_make_usrp) // == 1)
+        {
+            /*printf("ctr %d\n", ctr);*/
+            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+            printf("class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+            printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
+
+            imusrpui->usrp = uhd::usrp::multi_usrp::make(std::string(imusrpui->device_addr_string));
+
+            usrp_connected = true;
+            break;
+        }
+        //else
+        //{
+        //    printf("NOT SET %d\n", to_make_usrp);
+        //}
+    }
+    printf("USRP constructed\n");
+    //while (true)
+    //{
+    //    printf("%d\n", to_make_usrp);
+    //}
+
+    // join ui thread before exiting
+    uithrd.join();
+
+    return 0;
+}
+
+void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
+{
+    
     // For debugging?
-    ImUsrpUiRx rxsim(nullptr);
+    //ImUsrpUiRx rxsim(nullptr);
 
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
     if (!glfwInit())
-        return 1;
+        throw 1;
+        //return 1;
+
+    printf("A: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -70,13 +137,16 @@ int main(int, char**)
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
+    printf("B: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(1280, 720, "ImUSRP", NULL, NULL);
     if (window == NULL)
-        return 1;
+        throw 1;
+        //return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
+    printf("C: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -85,14 +155,17 @@ int main(int, char**)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    printf("D: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
+    printf("E: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+    printf("F: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -110,8 +183,6 @@ int main(int, char**)
     //IM_ASSERT(font != NULL);
 
     // Our state
-    bool show_demo_window = false; // disable imgui demo window
-    
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // Main loop
@@ -129,13 +200,9 @@ int main(int, char**)
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
         // 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
         {
-            ImGui::Begin("Diagnostics");   
+            ImGui::Begin("Diagnostics");
 
             ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
 
@@ -161,7 +228,7 @@ int main(int, char**)
         //ImPlot::ShowDemoWindow();
 
         // ImUSRP Rendering
-        imusrpui.render();
+        imusrpui->render();
         //rxsim.render();
 
         // Rendering
@@ -184,6 +251,4 @@ int main(int, char**)
 
     glfwDestroyWindow(window);
     glfwTerminate();
-
-    return 0;
 }
