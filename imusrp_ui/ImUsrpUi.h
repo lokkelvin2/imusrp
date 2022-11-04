@@ -29,7 +29,8 @@
 class ImUsrpUi
 {
 public:
-	ImUsrpUi(volatile int* make_usrp_flag);
+	//ImUsrpUi(volatile int* make_usrp_flag);
+	ImUsrpUi(std::atomic<bool>& atom_make_usrp);
 	~ImUsrpUi();
 
 	/// <summary>
@@ -38,7 +39,9 @@ public:
 	void render();
 
 	// This is the flag to command the main thread?
-	volatile int *to_make_usrp;
+	//volatile int *to_make_usrp;
+	std::atomic<bool>& m_atom_make_usrp;
+
 	bool usrp_ready = false;
 	// USRP object
 	uhd::usrp::multi_usrp::sptr usrp;

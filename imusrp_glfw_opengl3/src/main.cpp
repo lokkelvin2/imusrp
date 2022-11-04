@@ -39,6 +39,7 @@ static void glfw_error_callback(int error, const char* description)
 
 #include <thread>
 #include <uhd/usrp/multi_usrp.hpp>
+#include <atomic>
 
 // forward declaration
 void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui);
@@ -46,57 +47,49 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui);
 int main(int, char**)
 {
     // Application-specific instantiations
-    volatile int to_make_usrp = 0;
+
+    // It is important that we perform the construction of the usrp sptr object in the main thread.
+    // This is because it was found that RFNoC enabled USRPs like the X310 rely on the thread context;
+    // This means that the thread which calls the make() function must be kept alive in order for the object to continue working as intended.
+    // The best way to do this is to construct it ie make() in the main thread, and then everything else can be done in side threads.
+    bool usrp_connected = false;
+
+    // Old method to flag between threads
+    //volatile int to_make_usrp = 0;
     // NOTE: MAKE SURE THIS IS VOLATILE. OR ELSE YOU MUST DISABLE /O2 or /O1 optimizations for it to work!
     // LIKELY THAT /Og IS THE CULPRIT.
     // UNKNOWN WHETHER GCC SUFFERS FROM THE SAME ISSUE.
 
-    std::shared_ptr<ImUsrpUi> imusrpui= std::make_shared<ImUsrpUi>(&to_make_usrp);
-
+    // New C++11 recommendation, via https://stackoverflow.com/questions/4557979/when-to-use-volatile-with-multi-threading
+    // This is used instead of a volatile int/bool to flag between threads, marking std::memory_order_relaxed during stores/loads
+    std::atomic<bool> atom_make_usrp = false;
+    // Construct the UI to pass to secondary thread
+    std::shared_ptr<ImUsrpUi> imusrpui = std::make_shared<ImUsrpUi>(atom_make_usrp);
     std::thread uithrd(thread_imgui, imusrpui);
-
-    // spin while waiting
-    bool usrp_connected = false;
     
-    // printf("Before while loop %d\n", to_make_usrp);
+    // Spin main thread while waiting for the call to instantiate USRP
     while (!usrp_connected)
     {
-        //if (ctr == 0) { printf("first %d\n", to_make_usrp); }
-        //printf("ctr = %d\n", ctr);
-        // ctr++;
-        //printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-
-        // the below thread never works if not sleeping??
-        //std::this_thread::sleep_for(std::chrono::duration<double>(1.0));
-
-        if (to_make_usrp) // == 1)
+        //if (to_make_usrp == 1) // old method
+        if (atom_make_usrp.load(std::memory_order_relaxed))
         {
-            /*printf("ctr %d\n", ctr);*/
-            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-            // printf("class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
-            // printf("flag set? %d, Addr: %p\n", to_make_usrp, &to_make_usrp);
-
             imusrpui->usrp = uhd::usrp::multi_usrp::make(std::string(imusrpui->device_addr_string));
+            
             // Populate initial information
             imusrpui->usrp_initialinfo();
+            
             // Flag it
             imusrpui->usrp_ready = true;
+            
 
             usrp_connected = true;
-            to_make_usrp = 0; // set back to 0 to flag the UI
+            //to_make_usrp = 0; // set back to 0 to flag the UI, old method
+            atom_make_usrp.store(false, std::memory_order_relaxed);
             break;
         }
-        //else
-        //{
-        //    printf("NOT SET %d\n", to_make_usrp);
-        //}
     }
     printf("USRP constructed\n");
-    //while (true)
-    //{
-    //    printf("%d\n", to_make_usrp);
-    //}
+
 
     // join ui thread before exiting
     uithrd.join();
@@ -116,7 +109,7 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
         throw 1;
         //return 1;
 
-    printf("A: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("A: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
@@ -140,7 +133,7 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
-    printf("B: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("B: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(1280, 720, "ImUSRP", NULL, NULL);
@@ -149,7 +142,7 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
         //return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
-    printf("C: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("C: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -158,17 +151,17 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-    printf("D: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("D: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
-    printf("E: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("E: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-    printf("F: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
+    //printf("F: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.

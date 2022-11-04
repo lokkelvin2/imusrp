@@ -16,7 +16,8 @@ void ImUsrpUi::render()
 
 		//// Signal main thread to make?
 		//printf("before signalling, %d\n", *to_make_usrp);
-		*to_make_usrp = 1; //  true;
+		//*to_make_usrp = 1; //  true;
+		m_atom_make_usrp.store(true, std::memory_order_relaxed);
 		//printf("signalled main thread? %d\n", *to_make_usrp);
 
 		ImGui::OpenPopup("Initialising USRP..");
@@ -44,7 +45,8 @@ void ImUsrpUi::render()
 		// // =========
 
 		// New code where usrp is constructed in main thread
-		if (*to_make_usrp == 1)
+		/*if (*to_make_usrp == 1)*/
+		if (m_atom_make_usrp.load(std::memory_order_relaxed))
 		{
 			ImGui::Text("Please wait while the USRP is being initialised..");
 		}
@@ -250,8 +252,14 @@ void ImUsrpUi::set_rx_options(size_t chnl)
 }
 
 
-ImUsrpUi::ImUsrpUi(volatile int *make_usrp_flag)
-	: to_make_usrp{ make_usrp_flag }
+//ImUsrpUi::ImUsrpUi(volatile int *make_usrp_flag)
+//	: to_make_usrp{ make_usrp_flag }
+//{
+//
+//}
+
+ImUsrpUi::ImUsrpUi(std::atomic<bool>& atom_make_usrp)
+	: m_atom_make_usrp{ atom_make_usrp }
 {
 
 }
