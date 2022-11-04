@@ -52,25 +52,18 @@ int main(int, char**)
     // This is because it was found that RFNoC enabled USRPs like the X310 rely on the thread context;
     // This means that the thread which calls the make() function must be kept alive in order for the object to continue working as intended.
     // The best way to do this is to construct it ie make() in the main thread, and then everything else can be done in side threads.
-    bool usrp_connected = false;
-
-    // Old method to flag between threads
-    //volatile int to_make_usrp = 0;
-    // NOTE: MAKE SURE THIS IS VOLATILE. OR ELSE YOU MUST DISABLE /O2 or /O1 optimizations for it to work!
-    // LIKELY THAT /Og IS THE CULPRIT.
-    // UNKNOWN WHETHER GCC SUFFERS FROM THE SAME ISSUE.
+    std::atomic<bool> usrp_connected = false;
 
     // New C++11 recommendation, via https://stackoverflow.com/questions/4557979/when-to-use-volatile-with-multi-threading
     // This is used instead of a volatile int/bool to flag between threads, marking std::memory_order_relaxed during stores/loads
     std::atomic<bool> atom_make_usrp = false;
     // Construct the UI to pass to secondary thread
-    std::shared_ptr<ImUsrpUi> imusrpui = std::make_shared<ImUsrpUi>(atom_make_usrp);
+    std::shared_ptr<ImUsrpUi> imusrpui = std::make_shared<ImUsrpUi>(atom_make_usrp, usrp_connected);
     std::thread uithrd(thread_imgui, imusrpui);
     
     // Spin main thread while waiting for the call to instantiate USRP
-    while (!usrp_connected)
+    while (!usrp_connected.load(std::memory_order_relaxed))
     {
-        //if (to_make_usrp == 1) // old method
         if (atom_make_usrp.load(std::memory_order_relaxed))
         {
             imusrpui->usrp = uhd::usrp::multi_usrp::make(std::string(imusrpui->device_addr_string));
@@ -79,11 +72,9 @@ int main(int, char**)
             imusrpui->usrp_initialinfo();
             
             // Flag it
-            imusrpui->usrp_ready = true;
-            
+            usrp_connected.store(true, std::memory_order_relaxed);
+            //usrp_connected = true;
 
-            usrp_connected = true;
-            //to_make_usrp = 0; // set back to 0 to flag the UI, old method
             atom_make_usrp.store(false, std::memory_order_relaxed);
             break;
         }
@@ -109,8 +100,6 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
         throw 1;
         //return 1;
 
-    //printf("A: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
-
     // Decide GL+GLSL versions
 #if defined(IMGUI_IMPL_OPENGL_ES2)
     // GL ES 2.0 + GLSL 100
@@ -133,7 +122,6 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
     //glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);  // 3.2+ only
     //glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);            // 3.0+ only
 #endif
-    //printf("B: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Create window with graphics context
     GLFWwindow* window = glfwCreateWindow(1280, 720, "ImUSRP", NULL, NULL);
@@ -142,7 +130,6 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
         //return 1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
-    //printf("C: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -156,12 +143,10 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
     //ImGui::StyleColorsClassic();
-    //printf("E: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
-    //printf("F: class says %d, Addr: %p\n", *(imusrpui->to_make_usrp), imusrpui->to_make_usrp);
 
     // Load Fonts
     // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
@@ -209,16 +194,6 @@ void thread_imgui(std::shared_ptr<ImUsrpUi> imusrpui)
             ImGui::Text("VtxOffset = %s", (ImGui::GetIO().BackendFlags & ImGuiBackendFlags_RendererHasVtxOffset) ? "true" : "false");
             ImGui::End();
         }
-
-        //// 3. Show another simple window.
-        //if (show_another_window)
-        //{
-        //    ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        //    ImGui::Text("Hello from another window!");
-        //    if (ImGui::Button("Close Me"))
-        //        show_another_window = false;
-        //    ImGui::End();
-        //}
 
         // ImPlot Demo
         //ImPlot::ShowDemoWindow();

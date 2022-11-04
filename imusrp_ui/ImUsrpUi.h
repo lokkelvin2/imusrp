@@ -29,8 +29,7 @@
 class ImUsrpUi
 {
 public:
-	//ImUsrpUi(volatile int* make_usrp_flag);
-	ImUsrpUi(std::atomic<bool>& atom_make_usrp);
+	ImUsrpUi(std::atomic<bool>& atom_make_usrp, std::atomic<bool>& atom_usrp_ready);
 	~ImUsrpUi();
 
 	/// <summary>
@@ -38,11 +37,11 @@ public:
 	/// </summary>
 	void render();
 
-	// This is the flag to command the main thread?
-	//volatile int *to_make_usrp;
+	// Atomic flags to signal to/from main thread, only used in initial usrp instantiation
 	std::atomic<bool>& m_atom_make_usrp;
+	std::atomic<bool>& m_usrp_ready;
 
-	bool usrp_ready = false;
+	//bool usrp_ready = false;
 	// USRP object
 	uhd::usrp::multi_usrp::sptr usrp;
 	char device_addr_string[64] = "";
@@ -92,18 +91,6 @@ private:
 	std::thread thd;
 	bool thd_joined = true;
 	bool keep_make_thd_alive = true;
-
-
-	
-
-	/// <summary>
-	/// Method that wraps the usrp make() with a ready flag, for use in a separate thread.
-	/// </summary>
-	/// <param name="device_addr_string">Device address string</param>
-	void usrp_make(std::string device_addr_string);
-	// bool usrp_ready = false; // moved to public
-	
-
 
 	// Stream setups
 	const char *wirefmts[2] = {"sc16", "sc8"};

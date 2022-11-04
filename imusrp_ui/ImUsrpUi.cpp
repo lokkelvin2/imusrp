@@ -4,49 +4,21 @@ void ImUsrpUi::render()
 {
 	ImGui::Begin(m_windowname);
 
-	// DEBUGGING
-	//printf("FROM RENDER -> %d, Addr: %p\n", *to_make_usrp, to_make_usrp);
-
 	// Widgets go here
 	ImGui::InputText("Device Address", device_addr_string, 64);
 	if (ImGui::Button("Connect to USRP"))
 	{
-		// thd_joined = false;
-		// thd = std::thread(&ImUsrpUi::usrp_make, this, std::string(device_addr_string));
-
-		//// Signal main thread to make?
-		//printf("before signalling, %d\n", *to_make_usrp);
-		//*to_make_usrp = 1; //  true;
+		// Signal main thread to make?
 		m_atom_make_usrp.store(true, std::memory_order_relaxed);
-		//printf("signalled main thread? %d\n", *to_make_usrp);
 
+		// Open modal to wait..
 		ImGui::OpenPopup("Initialising USRP..");
-
-		//// Freezes the GUI
-		//usrp_make(std::string(device_addr_string));
 	}
 
 	if (ImGui::BeginPopupModal("Initialising USRP..", NULL, ImGuiWindowFlags_AlwaysAutoResize))
 	{
-		// // Deprecated
-		// if (usrp_ready)
-		// {
-		// 	if (!thd_joined) {
-		// 		thd.join();
-		// 		thd_joined = true;
-		// 	}
-		// 	ImGui::Text("USRP is connected.");
-		// 	if (ImGui::Button("Ok", ImVec2(120, 0))) { ImGui::CloseCurrentPopup(); }
-		// }
-		// else
-		// {
-		// 	ImGui::Text("Please wait while the USRP is being initialised..");
-		// }
-		// // =========
-
 		// New code where usrp is constructed in main thread
-		/*if (*to_make_usrp == 1)*/
-		if (m_atom_make_usrp.load(std::memory_order_relaxed))
+		if (!m_usrp_ready.load(std::memory_order_relaxed))
 		{
 			ImGui::Text("Please wait while the USRP is being initialised..");
 		}
@@ -60,7 +32,7 @@ void ImUsrpUi::render()
 	}
 
 	// If the usrp is connected, display some info
-	if (usrp_ready)
+	if (m_usrp_ready.load(std::memory_order_relaxed))
 	{
 		render_usrp_info();
 		render_subdev_info();
@@ -70,24 +42,6 @@ void ImUsrpUi::render()
 
 
 	ImGui::End();
-}
-
-void ImUsrpUi::usrp_make(std::string device_addr_string)
-{
-	usrp = uhd::usrp::multi_usrp::make(device_addr_string);
-	//// Lock clocks (TODO: allow ref changes)
-	//usrp->set_clock_source("internal");
-	//usrp->set_time_source("internal");
-
-	usrp_initialinfo();
-
-	// Flag it
-	usrp_ready = true;
-
-	// while (keep_make_thd_alive)
-	// {
-
-	// }
 }
 
 void ImUsrpUi::usrp_initialinfo()
@@ -251,15 +205,8 @@ void ImUsrpUi::set_rx_options(size_t chnl)
 	waiting_rx_settings = false;
 }
 
-
-//ImUsrpUi::ImUsrpUi(volatile int *make_usrp_flag)
-//	: to_make_usrp{ make_usrp_flag }
-//{
-//
-//}
-
-ImUsrpUi::ImUsrpUi(std::atomic<bool>& atom_make_usrp)
-	: m_atom_make_usrp{ atom_make_usrp }
+ImUsrpUi::ImUsrpUi(std::atomic<bool>& atom_make_usrp, std::atomic<bool>& atom_usrp_ready)
+	: m_atom_make_usrp{ atom_make_usrp }, m_usrp_ready{ atom_usrp_ready }
 {
 
 }
