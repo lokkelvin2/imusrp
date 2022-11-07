@@ -41,6 +41,8 @@ public:
 
     void thread_process_for_plots();
 
+    bool checkGoodRadix(int n);
+
 private:
     // Constructor requirements
 	uhd::rx_streamer::sptr rx_stream;
@@ -85,8 +87,14 @@ private:
     std::vector<std::complex<double>> reimplotdata;
     std::vector<double> spectrumdata;
     std::vector<double> ampplotdata;
+    std::vector<double> specgramdata;
     std::unique_ptr<std::mutex> mtx[3]; // as of now, don't seem to need the triple buffers?
 
     // Simulator function for testing without usrp
     void sim_to_buffer();
+
+    // Spectrogram options
+    int specgram_bins = 100;
+    bool auto_specgram_windows = true;
+    int num_specgram_buffers_to_use = 10; // we overlap add this number of buffers before performing the FFT
 };
