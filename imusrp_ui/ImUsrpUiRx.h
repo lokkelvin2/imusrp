@@ -100,4 +100,19 @@ private:
     bool auto_specgram_windows = true;
     int num_specgram_buffers_to_use = 10; // we overlap add this number of buffers before performing the FFT
     int specgram_timepoints; // In total, the specgram has (specgram_bins * specgram_timepoints) values
+
+    // Computation functions for neatness
+    void computeAmpPlot(int i, int numPerBatch, std::vector<std::complex<float>> &workspace);
+    void computeSpectrum(
+        int i, 
+        std::vector<std::complex<float>> &workspace, 
+        std::vector<float> &workspacereal,
+        IppsDFTSpec_C_32fc *pSpec,
+        Ipp8u *pBuffer);
+    void computeSpecgram(
+        int i,
+        int &specctr,
+        std::vector<std::complex<float>> &specworkspace,
+        IppsDFTSpec_C_32fc *pSpecSpecgram,
+        Ipp8u *pBufferSpecgram);
 };

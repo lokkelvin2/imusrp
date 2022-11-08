@@ -434,130 +434,25 @@ void ImUsrpUiRx::thread_process_for_plots()
                 time = rxtime[i];
 
                 /* AMPLITUDE PLOT COMPUTATIONS */
-                // move the data back by the buffer length
-                std::move(reimplotdata.begin() + numPerBatch, reimplotdata.end(), reimplotdata.begin());
-
-                // we now add new points from the new batch, but downsample immediately
-                int dsphase = 0;
-                int numStored;
-                ippsSampleDown_32fc(
-                    (Ipp32fc*)buffers[i].data(),
-                    (int)buffers[i].size(),
-                    (Ipp32fc*)workspace.data(),
-                    &numStored,
-                    plotdsr,
-                    &dsphase
-                );
-                if (numStored != numPerBatch) { break; } // sanity check
-
-                // Convert data type to double
-                ippsConvert_32f64f(
-                    (Ipp32f*)workspace.data(),
-                    (Ipp64f*)&reimplotdata.at(reimplotdata.size() - numPerBatch),
-                    numPerBatch * 2
-                );
+                computeAmpPlot(i, numPerBatch, workspace);
 
                 /* SPECTRUM PLOT COMPUTATIONS */
-                ippsDFTFwd_CToC_32fc(
-                    (Ipp32fc*)buffers[i].data(),
-                    (Ipp32fc*)workspace.data(),
+                computeSpectrum(
+                    i,
+                    workspace,
+                    workspacereal,
                     pSpec,
                     pBuffer
                 );
 
-                // first take abs squared
-                ippsPowerSpectr_32fc(
-                    (Ipp32fc*)workspace.data(),
-                    (Ipp32f*)workspacereal.data(),
-                    (int)workspace.size()
-                );
-                // then log10
-                ippsLog10_32f_A11(
-                    (Ipp32f*)workspacereal.data(),
-                    (Ipp32f*)workspace.data(), // we reuse the complex workspace
-                    (int)workspace.size()
-                );
-                // then * 10 for dB
-                ippsMulC_32f(
-                    (Ipp32f*)workspace.data(),
-                    10.0f,
-                    (Ipp32f*)workspacereal.data(),
-                    (int)workspace.size()
-                );
-
-                // fftshift (assume even valued size)
-                ippsCopy_32f(
-                    (Ipp32f*)workspacereal.data(), 
-                    (Ipp32f*)workspace.data(), // again reuse the complex workspace
-                    (int)workspace.size()/2
-                ); // copy left half out
-                ippsCopy_32f(
-                    (Ipp32f*)&workspacereal.at(workspace.size()/2),
-                    (Ipp32f*)&workspacereal.at(0),
-                    (int)workspace.size()/2
-                ); // move right half to left
-                ippsCopy_32f(
-                    (Ipp32f*)workspace.data(),
-                    (Ipp32f*)&workspacereal.at(workspace.size()/2),
-                    (int)workspace.size()/2
-                ); // copy left half to right
-                
-
-                // Convert data type to double as well
-                ippsConvert_32f64f(
-                    (Ipp32f*)workspacereal.data(),
-                    (Ipp64f*)spectrumdata.data(),
-                    spectrumdata.size()
-                );
-
                 /* SPECTROGRAM COMPUTATIONS */
-                // Every time we get a new buffer, we simply overlap add into the waiting workspace until we hit the required index
-                for (int k = 0; k < buffers[i].size(); k += specgram_bins)
-                {
-                    ippsAdd_32fc_I(
-                        (Ipp32fc*)&buffers[i].at(k),
-                        (Ipp32fc*)specworkspace.data(),
-                        specgram_bins
-                    );
-
-                    // Increment the counter
-                    specctr = (specctr + 1) % num_specgram_buffers_to_use;
-
-                    // If the counter is 0, it's time to perform the FFT
-                    if (specctr == 0)
-                    {
-                        ippsDFTFwd_CToC_32fc(
-                            (Ipp32fc*)specworkspace.data(), // input is first half
-                            (Ipp32fc*)&specworkspace.at(specgram_bins), // output is second half
-                            pSpecSpecgram,
-                            pBufferSpecgram
-                        );
-
-                        // Take the power of the data
-                        ippsPowerSpectr_32fc(
-                            (Ipp32fc*)&specworkspace.at(specgram_bins),
-                            (Ipp32f*)specworkspace.data(), // reuse the front of the workspace (this only takes half the memory)
-                            specgram_bins
-                        );
-
-                        // Push back the specgram plot data
-                        std::move(
-                            specgramdata.begin() + specgram_bins,
-                            specgramdata.end(),
-                            specgramdata.begin()
-                        );
-
-                        // Copy the output and convert into doubles
-                        ippsConvert_32f64f(
-                            (Ipp32f*)specworkspace.data(),
-                            (Ipp64f*)&specgramdata.at(specgramdata.size()-specgram_bins), // copy to the end
-                            specgram_bins
-                        );
-
-                        // At the end, re-zero the input workspace
-                        ippsZero_32fc((Ipp32fc*)specworkspace.data(), specworkspace.size());
-                    }
-                }
+                computeSpecgram(
+                    i,
+                    specctr,
+                    specworkspace,
+                    pSpecSpecgram,
+                    pBufferSpecgram
+                );
 
                 // record performance
                 procthdtime = timer.stop();
@@ -576,6 +471,148 @@ void ImUsrpUiRx::thread_process_for_plots()
 
 
 
+}
+
+void ImUsrpUiRx::computeAmpPlot(int i, int numPerBatch, std::vector<std::complex<float>> &workspace)
+{
+    // move the data back by the buffer length
+    std::move(reimplotdata.begin() + numPerBatch, reimplotdata.end(), reimplotdata.begin());
+
+    // we now add new points from the new batch, but downsample immediately
+    int dsphase = 0;
+    int numStored;
+    ippsSampleDown_32fc(
+        (Ipp32fc*)buffers[i].data(),
+        (int)buffers[i].size(),
+        (Ipp32fc*)workspace.data(),
+        &numStored,
+        plotdsr,
+        &dsphase
+    );
+    // if (numStored != numPerBatch) { break; } // sanity check
+
+    // Convert data type to double
+    ippsConvert_32f64f(
+        (Ipp32f*)workspace.data(),
+        (Ipp64f*)&reimplotdata.at(reimplotdata.size() - numPerBatch),
+        numPerBatch * 2
+    );
+}
+
+void ImUsrpUiRx::computeSpectrum(
+    int i, 
+    std::vector<std::complex<float>> &workspace, 
+    std::vector<float> &workspacereal,
+    IppsDFTSpec_C_32fc *pSpec,
+    Ipp8u *pBuffer)
+{
+    ippsDFTFwd_CToC_32fc(
+        (Ipp32fc*)buffers[i].data(),
+        (Ipp32fc*)workspace.data(),
+        pSpec,
+        pBuffer
+    );
+
+    // first take abs squared
+    ippsPowerSpectr_32fc(
+        (Ipp32fc*)workspace.data(),
+        (Ipp32f*)workspacereal.data(),
+        (int)workspace.size()
+    );
+    // then log10
+    ippsLog10_32f_A11(
+        (Ipp32f*)workspacereal.data(),
+        (Ipp32f*)workspace.data(), // we reuse the complex workspace
+        (int)workspace.size()
+    );
+    // then * 10 for dB
+    ippsMulC_32f(
+        (Ipp32f*)workspace.data(),
+        10.0f,
+        (Ipp32f*)workspacereal.data(),
+        (int)workspace.size()
+    );
+
+    // fftshift (assume even valued size)
+    ippsCopy_32f(
+        (Ipp32f*)workspacereal.data(), 
+        (Ipp32f*)workspace.data(), // again reuse the complex workspace
+        (int)workspace.size()/2
+    ); // copy left half out
+    ippsCopy_32f(
+        (Ipp32f*)&workspacereal.at(workspace.size()/2),
+        (Ipp32f*)&workspacereal.at(0),
+        (int)workspace.size()/2
+    ); // move right half to left
+    ippsCopy_32f(
+        (Ipp32f*)workspace.data(),
+        (Ipp32f*)&workspacereal.at(workspace.size()/2),
+        (int)workspace.size()/2
+    ); // copy left half to right
+    
+
+    // Convert data type to double as well
+    ippsConvert_32f64f(
+        (Ipp32f*)workspacereal.data(),
+        (Ipp64f*)spectrumdata.data(),
+        spectrumdata.size()
+    );
+}
+
+void ImUsrpUiRx::computeSpecgram(
+    int i,
+    int &specctr,
+    std::vector<std::complex<float>> &specworkspace,
+    IppsDFTSpec_C_32fc *pSpecSpecgram,
+    Ipp8u *pBufferSpecgram)
+{
+    // Every time we get a new buffer, we simply overlap add into the waiting workspace until we hit the required index
+    for (size_t k = 0; k < buffers[i].size(); k += specgram_bins)
+    {
+        ippsAdd_32fc_I(
+            (Ipp32fc*)&buffers[i].at(k),
+            (Ipp32fc*)specworkspace.data(),
+            specgram_bins
+        );
+
+        // Increment the counter
+        specctr = (specctr + 1) % num_specgram_buffers_to_use;
+
+        // If the counter is 0, it's time to perform the FFT
+        if (specctr == 0)
+        {
+            ippsDFTFwd_CToC_32fc(
+                (Ipp32fc*)specworkspace.data(), // input is first half
+                (Ipp32fc*)&specworkspace.at(specgram_bins), // output is second half
+                pSpecSpecgram,
+                pBufferSpecgram
+            );
+
+            // Take the power of the data
+            ippsPowerSpectr_32fc(
+                (Ipp32fc*)&specworkspace.at(specgram_bins),
+                (Ipp32f*)specworkspace.data(), // reuse the front of the workspace (this only takes half the memory)
+                specgram_bins
+            );
+
+            // Push back the specgram plot data
+            std::move(
+                specgramdata.begin() + specgram_bins,
+                specgramdata.end(),
+                specgramdata.begin()
+            );
+
+            // Copy the output and convert into doubles
+            ippsConvert_32f64f(
+                (Ipp32f*)specworkspace.data(),
+                (Ipp64f*)&specgramdata.at(specgramdata.size()-specgram_bins), // copy to the end
+                specgram_bins
+            );
+
+            // At the end, re-zero the input workspace
+            ippsZero_32fc((Ipp32fc*)specworkspace.data(), specworkspace.size());
+        }
+    }
 }
 
 bool ImUsrpUiRx::checkGoodRadix(int n)
