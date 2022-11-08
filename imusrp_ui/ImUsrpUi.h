@@ -21,6 +21,7 @@
 //#include <boost/thread/thread.hpp>
 #include <csignal>
 #include <fstream>
+#include <atomic>
 
 // Child windows
 #include "ImUsrpUiRx.h"

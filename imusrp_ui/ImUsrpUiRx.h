@@ -20,6 +20,8 @@
 #include "timer.h"
 #include "ipp.h"
 
+#define TARGET_SPECGRAM_NUMPTS 100000 // this is the comfortable rendering at 60fps value
+
 class ImUsrpUiRx
 {
 public:
@@ -86,7 +88,7 @@ private:
     // Containers for plotting
     std::vector<std::complex<double>> reimplotdata;
     std::vector<double> spectrumdata;
-    std::vector<double> ampplotdata;
+    // std::vector<double> ampplotdata; // not using this for now
     std::vector<double> specgramdata;
     std::unique_ptr<std::mutex> mtx[3]; // as of now, don't seem to need the triple buffers?
 
@@ -97,4 +99,5 @@ private:
     int specgram_bins = 100;
     bool auto_specgram_windows = true;
     int num_specgram_buffers_to_use = 10; // we overlap add this number of buffers before performing the FFT
+    int specgram_timepoints; // In total, the specgram has (specgram_bins * specgram_timepoints) values
 };

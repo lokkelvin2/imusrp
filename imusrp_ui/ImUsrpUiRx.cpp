@@ -29,7 +29,7 @@ void ImUsrpUiRx::render()
             ImGui::Text("Bad radix FFT size, try changing to a good multiple of small radices..");
         }
         ImGui::Text("Spectrogram frequency resolution = %f Hz/bin", *m_rxrate / specgram_bins);
-        ImGui::Text("Samples per buffer from USRP = %zd (fixed for now)", samps_per_buff);
+        // ImGui::Text("Samples per packet from USRP = %zd (fixed for now)", samps_per_buff); // this is technically not the actual packet, but what we set per recv call
         ImGui::Checkbox("Automatically tune spectrogram windows", &auto_specgram_windows);
         if (!auto_specgram_windows)
         {
@@ -38,12 +38,14 @@ void ImUsrpUiRx::render()
         else
         {
             // Fix it here, with a target heatmap density of total 100000 points (note that the resulting number may be slightly more due to clipping, but should be okay..)
-            num_specgram_buffers_to_use = numHistorySecs * static_cast<int>(*m_rxrate) / (100000 / specgram_bins) / (int)samps_per_buff;
+            specgram_timepoints = TARGET_SPECGRAM_NUMPTS / specgram_bins;
+            int samples_per_timepoint = numHistorySecs * static_cast<int>(*m_rxrate) / specgram_timepoints;
+            num_specgram_buffers_to_use = samples_per_timepoint / specgram_bins;
             num_specgram_buffers_to_use = num_specgram_buffers_to_use < 1 ? 1 : num_specgram_buffers_to_use; // ensure at least 1
-            ImGui::Text("Using %d buffers per spectrogram time point (to maintain high FPS)", num_specgram_buffers_to_use);
+            ImGui::Text("Using %d buffers (each of %d samples) per spectrogram time point (to maintain high FPS)", num_specgram_buffers_to_use, specgram_bins);
         }
-        ImGui::Text("Spectrogram time resolution = %fs", (double)(num_specgram_buffers_to_use * samps_per_buff) / *m_rxrate);
-        ImGui::Text("Total spectrogram points = %d", numHistorySecs * static_cast<int>(*m_rxrate) / (num_specgram_buffers_to_use * samps_per_buff) * specgram_bins);
+        ImGui::Text("Spectrogram time resolution = %fs", (double)(num_specgram_buffers_to_use * specgram_bins) / *m_rxrate);
+        ImGui::Text("Total spectrogram points = %d", specgram_timepoints * specgram_bins);
     }
     else 
     {
@@ -64,6 +66,7 @@ void ImUsrpUiRx::render()
             // We resize to the number of plot points only
             reimplotdata.resize(numPlotPts);
             spectrumdata.resize(samps_per_buff);
+            specgramdata.resize(specgram_bins * specgram_timepoints);
             // mark the boolean after resize
             stop_signal_called = false;
 
@@ -394,7 +397,7 @@ void ImUsrpUiRx::thread_process_for_plots()
     std::vector<std::complex<float>> workspace(samps_per_buff);
     std::vector<float> workspacereal(samps_per_buff);
     // temporary workspace vectors for spectrogram
-    std::vector<std::complex<float>> specworkspace(num_specgram_buffers_to_use * samps_per_buff);
+    std::vector<std::complex<float>> specworkspace(2 * specgram_bins); // double the space, for input and output
     int specctr = 0;
 
 
@@ -508,50 +511,53 @@ void ImUsrpUiRx::thread_process_for_plots()
                 );
 
                 /* SPECTROGRAM COMPUTATIONS */
-                // First copy into the workspace
-                ippsCopy_32fc(
-                    (Ipp32fc*)buffers[i].data(),
-                    (Ipp32fc*)&specworkspace.at(specctr * samps_per_buff), // copy to the counter
-                    samps_per_buff);
-
-                // If we copied into the last one then do everything else
-                if (specctr == num_specgram_buffers_to_use - 1)
+                // Every time we get a new buffer, we simply overlap add into the waiting workspace until we hit the required index
+                for (int k = 0; k < buffers[i].size(); k += specgram_bins)
                 {
-                    // Move the spectrogram plot data to the left i.e. delete earliest time slice
-                    std::move(specgramdata.begin() + specgram_bins, specgramdata.end(), specgramdata.begin());
-
-                    // Overlap add within the workspace (add to the front memory)
-                    for (int o = 1; o < specworkspace.size() / specgram_bins; o++)
-                    {
-                        ippsAdd_32fc_I(
-                            (Ipp32fc*)&specworkspace.at(o * specgram_bins),
-                            (Ipp32fc*)specworkspace.data(),
-                            specgram_bins
-                        );
-                    }
-
-                    // Perform the FFT for latest time point
-                    ippsDFTFwd_CToC_32fc(
+                    ippsAdd_32fc_I(
+                        (Ipp32fc*)&buffers[i].at(k),
                         (Ipp32fc*)specworkspace.data(),
-                        (Ipp32fc*)workspace.data(), // reuse the amp plot workspace, should be big enough?
-                        pSpecSpecgram,
-                        pBufferSpecgram
+                        specgram_bins
                     );
 
-                    // Take the magnitude
-                    // TODO
+                    // Increment the counter
+                    specctr = (specctr + 1) % num_specgram_buffers_to_use;
 
-                    // Convert into doubles
-                    //ippsConvert_32f64f(
-                    //    (Ipp32f*)workspace.data(),
-                    //    (Ipp64f*)spectrumdata.data(),
-                    //    spectrumdata.size()
-                    //);
+                    // If the counter is 0, it's time to perform the FFT
+                    if (specctr == 0)
+                    {
+                        ippsDFTFwd_CToC_32fc(
+                            (Ipp32fc*)specworkspace.data(), // input is first half
+                            (Ipp32fc*)&specworkspace.at(specgram_bins), // output is second half
+                            pSpecSpecgram,
+                            pBufferSpecgram
+                        );
 
-                    // Finally reset the counter
-                    specctr = 0;
+                        // Take the power of the data
+                        ippsPowerSpectr_32fc(
+                            (Ipp32fc*)&specworkspace.at(specgram_bins),
+                            (Ipp32f*)specworkspace.data(), // reuse the front of the workspace (this only takes half the memory)
+                            specgram_bins
+                        );
+
+                        // Push back the specgram plot data
+                        std::move(
+                            specgramdata.begin() + specgram_bins,
+                            specgramdata.end(),
+                            specgramdata.begin()
+                        );
+
+                        // Copy the output and convert into doubles
+                        ippsConvert_32f64f(
+                            (Ipp32f*)specworkspace.data(),
+                            (Ipp64f*)&specgramdata.at(specgramdata.size()-specgram_bins), // copy to the end
+                            specgram_bins
+                        );
+
+                        // At the end, re-zero the input workspace
+                        ippsZero_32fc((Ipp32fc*)specworkspace.data(), specworkspace.size());
+                    }
                 }
-
 
                 // record performance
                 procthdtime = timer.stop();
