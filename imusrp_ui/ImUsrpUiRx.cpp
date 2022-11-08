@@ -149,7 +149,7 @@ void ImUsrpUiRx::render()
         
 		ImPlot::EndPlot();
 	}
-
+    // Spectrum plot
     if (ImPlot::BeginPlot("##fftplot"))
     {
         if (!stop_signal_called)
@@ -170,6 +170,34 @@ void ImUsrpUiRx::render()
 
         ImPlot::EndPlot();
     }
+    // Spectrogram plot
+    if (ImPlot::BeginPlot("##specgramplot"))
+    {
+        if (!stop_signal_called)
+        {
+            const ImPlotColormap map = ImPlotColormap_Viridis;
+            ImPlot::PushColormap(map);
+
+            ImPlot::SetupAxes("Time (s)", "Frequency (Hz)");
+            // ImPlot::SetupAxisLimits(ImAxis_X1, 0, (double)numHistorySecs);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, (double)numHistorySecs); // maybe this is what we want?
+            ImPlot::PlotHeatmap(
+                "Specgram",
+                specgramdata.data(),
+                specgram_bins,
+                specgram_timepoints,
+                0, 0, // scale min/max
+                NULL, // no labels
+                ImPlotPoint(0, -static_cast<double>(specgram_bins)/2 * (*m_rxrate)),
+                ImPlotPoint((double)numHistorySecs, static_cast<double>(specgram_bins)/2 * (*m_rxrate)),
+                ImPlotHeatmapFlags_ColMajor // check this? effectively transpose?
+            );
+
+            ImPlot::PopColormap();
+
+        }
+    }
+    
 
     if (!stop_signal_called)
     {
