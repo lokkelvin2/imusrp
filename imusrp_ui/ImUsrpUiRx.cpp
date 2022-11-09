@@ -50,6 +50,10 @@ void ImUsrpUiRx::render()
     else 
     {
         ImGui::Text("History length (seconds): %d", numHistorySecs);
+        ImGui::Text("Spectrogram bins = %d", specgram_bins);
+        ImGui::Text("Spectrogram time points = %d", specgram_timepoints);
+        ImGui::Text("Spectrogram time resolution = %fs", (double)(num_specgram_buffers_to_use * specgram_bins) / *m_rxrate);
+        ImGui::Text("Total spectrogram points = %d", specgram_timepoints * specgram_bins);
     }
 
     if (ImGui::Button("Start")) {
@@ -94,14 +98,14 @@ void ImUsrpUiRx::render()
     ImGui::SameLine();
     
     /* SIMULATION ONLY. FOR DEBUGGING WITHOUT A USRP */
-    if (ImGui::Button("Simulate"))
-    {
-        reimplotdata.resize(numHistorySecs * 200000);
-        stop_signal_called = false;
+    //if (ImGui::Button("Simulate"))
+    //{
+    //    reimplotdata.resize(numHistorySecs * 200000);
+    //    stop_signal_called = false;
 
-        thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
-        procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
-    }
+    //    thd = std::thread(&ImUsrpUiRx::sim_to_buffer, this);
+    //    procthd = std::thread(&ImUsrpUiRx::thread_process_for_plots, this);
+    //}
     /* END OF SIMULATION ONLY. */
 
     if (ImGui::Button("End")) {
@@ -127,7 +131,7 @@ void ImUsrpUiRx::render()
         // note, stride of PlotLine is very slow, likely need to stride externally
         // only plot lines if its running
         if (!stop_signal_called) {
-            ImPlot::SetupAxisLimits(ImAxis_X1,0,(double)numHistorySecs); //, ImGuiCond_Always);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, (double)numHistorySecs); // prevent scroll out of bounds
             ImPlot::SetupAxes("Time (s)", "Amplitude");//, ImPlotAxisFlags_Lock); //, ImPlotAxisFlags_None, ImPlotAxisFlags_AutoFit);
             ImPlot::PlotLine("Real",
                 (double*)reimplotdata.data() + 0,
@@ -156,10 +160,10 @@ void ImUsrpUiRx::render()
         {
             const double leftFreq = -(double)*m_rxrate / 2;
             ImPlot::SetupAxes("Frequency (Hz)", "Power (dB)"); //, ImPlotAxisFlags_None, ImPlotAxisFlags_AutoFit);
-            ImPlot::SetupAxisLimits(ImAxis_X1, leftFreq, -leftFreq); //, ImGuiCond_Always);
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, leftFreq, -leftFreq); // prevent scroll out of bounds
             ImPlot::PlotLine("FFT",
                 spectrumdata.data(),
-                spectrumdata.size(),
+                (int)spectrumdata.size(),
                 *m_rxrate / (double)spectrumdata.size(), // xscale (steps)
                 leftFreq, // xstart (leftmost pt)
                 0, // flags
@@ -175,27 +179,28 @@ void ImUsrpUiRx::render()
     {
         if (!stop_signal_called)
         {
+            const double leftFreq = -(double)*m_rxrate / 2;
             const ImPlotColormap map = ImPlotColormap_Viridis;
             ImPlot::PushColormap(map);
 
-            ImPlot::SetupAxes("Time (s)", "Frequency (Hz)");
-            // ImPlot::SetupAxisLimits(ImAxis_X1, 0, (double)numHistorySecs);
-            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, 0, (double)numHistorySecs); // maybe this is what we want?
+            ImPlot::SetupAxes("Frequency (Hz)", "Time (s)");
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_X1, leftFreq, -leftFreq); // prevent scroll out of bounds
+            ImPlot::SetupAxisLimitsConstraints(ImAxis_Y1, 0, (double)numHistorySecs); // prevent scroll out of bounds
             ImPlot::PlotHeatmap(
                 "Specgram",
                 specgramdata.data(),
-                specgram_bins,
-                specgram_timepoints,
+                specgram_timepoints, // specgram_timepoints, // specgram_bins, // rows
+                specgram_bins, // specgram_bins, // specgram_timepoints, // cols
                 0, 0, // scale min/max
-                NULL, // no labels
-                ImPlotPoint(0, -static_cast<double>(specgram_bins)/2 * (*m_rxrate)),
-                ImPlotPoint((double)numHistorySecs, static_cast<double>(specgram_bins)/2 * (*m_rxrate)),
-                ImPlotHeatmapFlags_ColMajor // check this? effectively transpose?
+                NULL, // no labels,
+                ImPlotPoint(leftFreq, 0), //btm left
+                ImPlotPoint(-leftFreq, (double)numHistorySecs) //top right
             );
 
             ImPlot::PopColormap();
-
         }
+
+        ImPlot::EndPlot();
     }
     
 
@@ -420,7 +425,7 @@ void ImUsrpUiRx::thread_process_for_plots()
 {
     HighResolutionTimer timer;
 
-    int numPerBatch = samps_per_buff / plotdsr;
+    int numPerBatch = (int)samps_per_buff / plotdsr;
     // temporary workspace vectors
     std::vector<std::complex<float>> workspace(samps_per_buff);
     std::vector<float> workspacereal(samps_per_buff);
@@ -431,7 +436,7 @@ void ImUsrpUiRx::thread_process_for_plots()
 
     // prepare the IPP FFT on the entire incoming buffer (this is for the spectrum)
     int sizeSpec = 0, sizeInit = 0, sizeBuf = 0;
-    int fftlen = samps_per_buff;
+    int fftlen = (int)samps_per_buff;
     ippsDFTGetSize_C_32fc(fftlen, IPP_FFT_NODIV_BY_ANY, ippAlgHintFast, &sizeSpec, &sizeInit, &sizeBuf);
     /* memory allocation */
     IppsDFTSpec_C_32fc *pSpec = (IppsDFTSpec_C_32fc*)ippMalloc(sizeSpec);
@@ -583,7 +588,7 @@ void ImUsrpUiRx::computeSpectrum(
     ippsConvert_32f64f(
         (Ipp32f*)workspacereal.data(),
         (Ipp64f*)spectrumdata.data(),
-        spectrumdata.size()
+        (int)spectrumdata.size()
     );
 }
 
@@ -630,15 +635,30 @@ void ImUsrpUiRx::computeSpecgram(
                 specgramdata.begin()
             );
 
-            // Copy the output and convert into doubles
+            // Copy the output and convert into doubles, fftshifting in the process
+            // Assume even bins for now
+            Ipp32f* cast_ptr = (Ipp32f*)specworkspace.data(); // recast the pointer
             ippsConvert_32f64f(
-                (Ipp32f*)specworkspace.data(),
-                (Ipp64f*)&specgramdata.at(specgramdata.size()-specgram_bins), // copy to the end
-                specgram_bins
-            );
+                (Ipp32f*)&specworkspace.at(0), // copy left half, this is okay since 0 is 0
+                (Ipp64f*)&specgramdata.at(specgramdata.size() - specgram_bins / 2), // to right half
+                specgram_bins / 2);
+            ippsConvert_32f64f(
+                (Ipp32f*)&cast_ptr[specgram_bins/2], // right half, note that we use the cast_ptr in order to traverse in half the number of elements, since the output data only occupies half of the complex space
+                (Ipp64f*)&specgramdata.at(specgramdata.size() - specgram_bins), // to left half
+                specgram_bins / 2);
+            
+            
+
+
+
+            //ippsConvert_32f64f(
+            //    (Ipp32f*)specworkspace.data(),
+            //    (Ipp64f*)&specgramdata.at(specgramdata.size()-specgram_bins), // copy to the end
+            //    specgram_bins
+            //);
 
             // At the end, re-zero the input workspace
-            ippsZero_32fc((Ipp32fc*)specworkspace.data(), specworkspace.size());
+            ippsZero_32fc((Ipp32fc*)specworkspace.data(), (int)specworkspace.size());
         }
     }
 }

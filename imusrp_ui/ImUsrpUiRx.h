@@ -20,7 +20,7 @@
 #include "timer.h"
 #include "ipp.h"
 
-#define TARGET_SPECGRAM_NUMPTS 100000 // this is the comfortable rendering at 60fps value
+#define TARGET_SPECGRAM_NUMPTS 50000 // this is the comfortable rendering at 60fps value
 
 class ImUsrpUiRx
 {

@@ -72,7 +72,7 @@ private:
 	void set_rx_options(size_t chnl);
 	bool waiting_rx_settings = false;
 	// Sample rate
-	int rxrate = 1e6;
+	int rxrate = 1000000;
 	double actualrxrate = 0; // actual is always double
 	double rxratemin, rxratemax, rxratestep;
 	// Frequencies
