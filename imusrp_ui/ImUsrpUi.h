@@ -58,6 +58,10 @@ private:
 	/// </summary>
 	void render_usrp_info();
 	std::string usrp_pp_string;
+	double master_clock_rate;
+	double master_clock_rate_min;
+	double master_clock_rate_max;
+	double master_clock_rate_step;
 
 	/// <summary>
 	/// Render section to display subdevice information.
@@ -79,6 +83,11 @@ private:
 	float rxfreq = 1e9;
 	double actualrxfreq = 0; // actual is always double
 	double rxfreqmin, rxfreqmax, rxfreqstep;
+	// RX Frontend Bandwidth 
+	double rx_bw_min;
+	double rx_bw_max;
+	double rx_bw_step;
+
 	//// LO Offset (not sure how to get LO source name properly)
 	//double rxlo_off = 0;
 	//double actualrxlo_off;

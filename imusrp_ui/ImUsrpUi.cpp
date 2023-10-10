@@ -48,6 +48,12 @@ void ImUsrpUi::usrp_initialinfo()
 {
 	// Collect initial information
 	usrp_pp_string = usrp->get_pp_string();
+	master_clock_rate = usrp->get_master_clock_rate();
+	auto master_clock_rate_range = usrp->get_master_clock_rate_range();
+	master_clock_rate_min = master_clock_rate_range.start();
+	master_clock_rate_max = master_clock_rate_range.stop();
+	master_clock_rate_step = master_clock_rate_range.step();
+
 	tx_subdev_spec = usrp->get_tx_subdev_spec();
 	rx_subdev_spec = usrp->get_rx_subdev_spec();
 	// Initial ranges
@@ -65,12 +71,30 @@ void ImUsrpUi::usrp_initialinfo()
 	rxgainmin = rxgain_range.start();
 	rxgainmax = rxgain_range.stop();
 	rxgainstep = rxgain_range.step();
+
+	auto rx_bw_range = usrp->get_rx_bandwidth_range();
+	rx_bw_min = rx_bw_range.start();
+	rx_bw_max = rx_bw_range.stop();
+	rx_bw_step = rx_bw_range.step();
 }
 
 void ImUsrpUi::render_usrp_info()
 {
-	if (ImGui::Button("Refresh USRP Info")) { usrp_pp_string = usrp->get_pp_string(); }
+	if (ImGui::Button("Refresh USRP Info")) { 
+		usrp_pp_string = usrp->get_pp_string();
+		master_clock_rate = usrp->get_master_clock_rate();
+		auto master_clock_rate_range = usrp->get_master_clock_rate_range();
+		master_clock_rate_min = master_clock_rate_range.start();
+		master_clock_rate_max = master_clock_rate_range.stop();
+		master_clock_rate_step = master_clock_rate_range.step();
+	}
 	ImGui::Text("%s", usrp_pp_string.c_str());
+	ImGui::Separator();
+	ImGui::TextWrapped("Master clock rate: %f (Range %f->%f, %f step)",
+		master_clock_rate,
+		master_clock_rate_min, master_clock_rate_max, master_clock_rate_step
+	);
+	ImGui::Separator();
 }
 
 void ImUsrpUi::render_subdev_info()
@@ -78,13 +102,21 @@ void ImUsrpUi::render_subdev_info()
 	if (ImGui::Button("Refresh Subdevice Specs")) {
 		tx_subdev_spec = usrp->get_tx_subdev_spec();
 		rx_subdev_spec = usrp->get_rx_subdev_spec();
+
+		auto rx_bw_range = usrp->get_rx_bandwidth_range();
+		rx_bw_min = rx_bw_range.start();
+		rx_bw_max = rx_bw_range.stop();
+		rx_bw_step = rx_bw_range.step();
 	}
 	ImGui::Text("TX Details");
 	ImGui::Text("%s", tx_subdev_spec.to_pp_string().c_str());
 	ImGui::Text("RX Details");
 	ImGui::Text("%s", rx_subdev_spec.to_pp_string().c_str());
+	ImGui::Separator();
 
-
+	ImGui::Text("RX Bandwidth Range");
+	ImGui::TextWrapped("%f -> %f, step %f", rx_bw_min, rx_bw_max, rx_bw_step);
+	ImGui::Separator();
 }
 
 void ImUsrpUi::render_rx_options()
