@@ -34,3 +34,5 @@
 # Disassembled things
 *.dump
 *.s
+
+build/
